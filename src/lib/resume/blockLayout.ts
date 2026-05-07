@@ -85,6 +85,8 @@ export function getDefaultBlockSettings(type: BlockType): Record<string, unknown
         showGithub: true,
         showLinkedin: true,
         showWebsite: true,
+        showLocation: false,
+        contactLayout: 'inline',
         nameSize: 'normal',
       } satisfies HeaderSettings;
     case 'summary':
@@ -134,6 +136,8 @@ export interface HeaderSettings {
   showGithub: boolean;
   showLinkedin: boolean;
   showWebsite: boolean;
+  showLocation: boolean;
+  contactLayout: 'inline' | 'stacked';
   nameSize: NameSize;
 }
 

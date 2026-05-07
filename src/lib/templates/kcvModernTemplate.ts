@@ -174,6 +174,8 @@ function getHeaderSettings(layout: ResumeLayout | undefined): HeaderSettings {
     showGithub: true,
     showLinkedin: true,
     showWebsite: true,
+    showLocation: false,
+    contactLayout: 'inline',
     nameSize: 'normal',
   };
   if (!layout?.blocks) return defaults;
@@ -233,6 +235,7 @@ interface RenderData {
   linkedin: string;
   website: string;
   phone: string;
+  location: string;
   summaryText: string;
   eduItems: { degree: string; institution: string; city: string; startYear: string; endYear: string; status: string }[];
   skillItems: { groupName: string; skills: string[] }[];
@@ -261,13 +264,47 @@ function renderBlockSection(
       const alignEnv = hs.alignment === 'left' ? '\\begin{flushleft}' : hs.alignment === 'right' ? '\\begin{flushright}' : '\\begin{center}';
       const alignEnd = hs.alignment === 'left' ? '\\end{flushleft}' : hs.alignment === 'right' ? '\\end{flushright}' : '\\end{center}';
       const nameSize = hs.nameSize === 'large' ? '\\Large' : hs.nameSize === 'compact' ? '\\large' : '\\LARGE';
-      let tex = `% KCV-BLOCK: header\n${alignEnv}\n\\cvname{${nameSize}}{${data.name}}\n\\cvrole{${data.role}}\n\n\\begin{tabular}{l}\n`;
-      if (hs.showEmail) tex += `\\contactitem{Envelope}{Email}{${data.email}}\n`;
-      if (hs.showGithub) tex += `\\contactitem{Github}{GitHub}{${data.github}}\n`;
-      if (hs.showLinkedin && data.linkedin) tex += `\\contactitem{Linkedin}{LinkedIn}{${data.linkedin}}\n`;
-      if (hs.showWebsite && data.website) tex += `\\contactitem{Globe}{Web}{${data.website}}\n`;
-      if (hs.showPhone && data.phone) tex += `\\contactitem{Phone}{Tel}{${data.phone}}\n`;
-      tex += `\\end{tabular}\n\\vspace{1em}\n${alignEnd}\n\n`;
+
+      // Build list of contact items to render
+      type ContactItem = { icon: string; label: string; value: string };
+      const contacts: ContactItem[] = [];
+      if (hs.showEmail && data.email) contacts.push({ icon: 'Envelope', label: 'Email', value: data.email });
+      if (hs.showGithub && data.github) contacts.push({ icon: 'Github', label: 'GitHub', value: data.github });
+      if (hs.showLinkedin && data.linkedin) contacts.push({ icon: 'Linkedin', label: 'LinkedIn', value: data.linkedin });
+      if (hs.showWebsite && data.website) contacts.push({ icon: 'Globe', label: 'Web', value: data.website });
+      if (hs.showPhone && data.phone) contacts.push({ icon: 'Phone', label: 'Tel', value: data.phone });
+      if (hs.showLocation && (data as unknown as { location?: string }).location) contacts.push({ icon: 'MapMarker', label: 'Loc', value: (data as unknown as { location?: string }).location ?? '' });
+
+      let tex = `% KCV-BLOCK: header\n${alignEnv}\n\\cvname{${nameSize}}{${data.name}}\n\\cvrole{${data.role}}\n`;
+
+      if (contacts.length > 0) {
+        if (hs.contactLayout === 'stacked') {
+          tex += '\\begin{tabular}{l}\n';
+          for (const c of contacts) {
+            const url = c.icon === 'Envelope' ? `mailto:${c.value}` :
+                        c.icon === 'Phone' ? `tel:${c.value.replace(/\s/g, '')}` :
+                        c.value;
+            tex += `\\contactitem{${c.icon}}{${c.label}}{\\href{${url}}{${c.value}}}\n`;
+          }
+          tex += '\\end{tabular}\n';
+        } else {
+          // Inline: single line with \quad separators
+          tex += '{\\small\\raggedright\n';
+          for (let i = 0; i < contacts.length; i++) {
+            const c = contacts[i];
+            const url = c.icon === 'Envelope' ? `mailto:${c.value}` :
+                        c.icon === 'Phone' ? `tel:${c.value.replace(/\s/g, '')}` :
+                        c.value;
+            tex += `\\fa${c.icon}\\ \\href{${url}}{${c.value}}`;
+            if (i < contacts.length - 1) {
+              tex += ' \\quad';
+            }
+          }
+          tex += '\n}\n';
+        }
+      }
+
+      tex += `\\vspace{1em}\n${alignEnd}\n\n`;
       return tex;
     }
     case 'summary': {
@@ -401,6 +438,7 @@ function renderKcvModern(resume: Resume): string {
     linkedin,
     website,
     phone,
+    location: personal.location ? escapeLatex(personal.location) : '',
     summaryText,
     eduItems,
     skillItems,

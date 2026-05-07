@@ -51,6 +51,8 @@ export interface HeaderSettings {
   showGithub: boolean;
   showLinkedin: boolean;
   showWebsite: boolean;
+  showLocation: boolean;
+  contactLayout: 'inline' | 'stacked';
   nameSize: NameSize;
 }
 
