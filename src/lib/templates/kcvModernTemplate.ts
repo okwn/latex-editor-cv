@@ -357,7 +357,7 @@ function renderBlockSection(
       const skillVspace = spacingValue(sk.spacing, '0.3em', 0);
       const useCols = sk.columns > 1 && sk.style !== 'chips';
       let tex = `% KCV-BLOCK: skills\n\\section{Skills}\n`;
-      if (useCols) tex += `\\begin{multicols{${sk.columns}}\\raggedcolumns\n`;
+      if (useCols) tex += `\\begin{multicols}{${sk.columns}}\\raggedcolumns\n`;
       if (sk.style === 'chips') {
         for (const group of data.skillItems) {
           tex += `\\textbf{\\color{kcvaccent}${group.groupName}:}\\ `;
@@ -384,7 +384,7 @@ function renderBlockSection(
       const projVspace = spacingValue(ps.spacing, '0.5em', 0);
       const boxSep = ps.cardSize === 'compact' ? '2pt' : ps.cardSize === 'large' ? '8pt' : '4pt';
       let tex = `% KCV-BLOCK: projects\n\\section{Projects}\n`;
-      if (ps.columns > 1) tex += `\\begin{multicols{${ps.columns}}\\raggedcolumns\n`;
+      if (ps.columns > 1) tex += `\\begin{multicols}{${ps.columns}}\\raggedcolumns\n`;
       for (const proj of data.displayProjects) {
         const linkPart = ps.showLinks && proj.linkUrl
           ? `\\href{${proj.linkUrl}}{${proj.linkLabel}}`
