@@ -224,10 +224,10 @@ export function normalizeBlockLayout(resume: Resume): Resume {
     return { ...resume, resumeLayout: layout, customBlocks: [] };
   }
 
-  // Deduplicate custom blocks of unique types
-  const deduped = dedupeCustomBlocks({ ...resume, resumeLayout: layout });
+  // Deduplicate layout blocks and custom blocks
+  let result = deduplicateAllBlocks({ ...resume, resumeLayout: layout });
 
-  return { ...deduped, resumeLayout: layout };
+  return { ...result, resumeLayout: result.resumeLayout || layout };
 }
 
 export function getActiveBlocksInOrder(layout: ResumeLayout): BlockConfig[] {
@@ -394,12 +394,42 @@ export function getCustomBlocksInOrder(resume: Resume): CustomBlock[] {
   return resume.resumeLayout.customBlocksOrder.map((id) => byId.get(id)).filter(Boolean) as CustomBlock[];
 }
 
-export function dedupeCustomBlocks(resume: Resume): Resume {
+// Deduplicate layout blocks — keep only first entry per unique block type
+function dedupeLayoutBlocks(resume: Resume): Resume {
+  if (!resume.resumeLayout?.blocks?.length) return resume;
+
+  const seen = new Map<BlockType, string>();
+  const keep: BlockConfig[] = [];
+
+  for (const block of resume.resumeLayout.blocks) {
+    const def = BLOCK_DEFINITIONS[block.type];
+    if (!def.unique) {
+      keep.push(block);
+      continue;
+    }
+    if (seen.has(block.type)) {
+      continue;
+    }
+    seen.set(block.type, block.id);
+    keep.push(block);
+  }
+
+  if (keep.length === resume.resumeLayout.blocks.length) return resume;
+
+  const deduped = {
+    ...resume.resumeLayout,
+    blocks: keep.map((b, i) => ({ ...b, order: i })),
+  };
+
+  return { ...resume, resumeLayout: deduped };
+}
+
+// Deduplicate custom blocks — keep only first entry per unique custom block type
+function dedupeCustomBlocks(resume: Resume): Resume {
   if (!resume.customBlocks?.length) return resume;
 
   const seen = new Map<CustomBlockType, string>();
   const keep: CustomBlock[] = [];
-  const removeIds = new Set<string>();
 
   for (const block of resume.customBlocks) {
     const def = BLOCK_DEFINITIONS[block.type as CustomBlockType];
@@ -408,23 +438,56 @@ export function dedupeCustomBlocks(resume: Resume): Resume {
       continue;
     }
     if (seen.has(block.type as CustomBlockType)) {
-      removeIds.add(block.id);
-    } else {
-      seen.set(block.type as CustomBlockType, block.id);
-      keep.push(block);
+      continue;
     }
+    seen.set(block.type as CustomBlockType, block.id);
+    keep.push(block);
   }
 
-  if (removeIds.size === 0) return resume;
+  if (keep.length === resume.customBlocks.length) return resume;
 
-  const filtered = keep;
-  const order = (resume.resumeLayout?.customBlocksOrder || []).filter((id) => !removeIds.has(id));
+  const removeIds = resume.customBlocks
+    .map((b) => b.id)
+    .filter((id) => !keep.some((k) => k.id === id));
+
+  const order = (resume.resumeLayout?.customBlocksOrder || []).filter((id) => !removeIds.includes(id));
 
   return {
     ...resume,
-    customBlocks: filtered,
+    customBlocks: keep,
     resumeLayout: resume.resumeLayout
       ? { ...resume.resumeLayout, customBlocksOrder: order }
       : undefined,
   };
+}
+
+// Combined deduplication: layout blocks + custom blocks
+export function deduplicateAllBlocks(resume: Resume): Resume {
+  let result = dedupeLayoutBlocks(resume);
+  result = dedupeCustomBlocks(result);
+  return result;
+}
+
+// Returns 'add' | 'added' | 'activate' | 'coming-soon' for a given block type
+export function getBlockStoreStatus(resume: Resume, type: BlockType): 'add' | 'added' | 'activate' | 'coming-soon' {
+  const def = BLOCK_DEFINITIONS[type];
+  if (!def.supported) return 'coming-soon';
+
+  const layout = resume.resumeLayout;
+  if (layout?.blocks) {
+    const block = layout.blocks.find((b) => b.type === type);
+    if (block) {
+      return block.active ? 'added' : 'activate';
+    }
+  }
+
+  const isCustomType = ['customText', 'languages', 'awards', 'links', 'experience', 'publications'].includes(type);
+  if (isCustomType) {
+    const exists = (resume.customBlocks || []).some((b) => b.type === type);
+    if (exists) {
+      return def.unique ? 'added' : 'add';
+    }
+  }
+
+  return 'add';
 }

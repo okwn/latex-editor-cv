@@ -6,20 +6,13 @@ import {
   BlockType,
   BLOCK_DEFINITIONS,
   CustomBlockType,
-} from '@/types/blockLayout';
-import {
-  addCustomBlock,
-  hasBlockOfType,
+  getBlockStoreStatus,
   addBlock,
   toggleBlockActive,
-  getBlockById,
-  moveBlock,
-  removeBlock,
-  moveCustomBlock,
-  removeCustomBlock,
+  addCustomBlock,
 } from '@/lib/resume/blockLayout';
 import { useToast } from '@/components/ui/Toast';
-import { X, Plus, Check, ChevronUp, ChevronDown, Trash2, AlertTriangle } from 'lucide-react';
+import { X, Plus, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const BLOCK_TYPE_GROUPS = [
@@ -75,23 +68,26 @@ const ICON_MAP: Record<string, React.ComponentType<{ size: number; className?: s
   ),
 };
 
-interface BlockStoreCardProps {
+interface BlockCardProps {
   type: BlockType;
-  isAdded: boolean;
-  isInactive: boolean;
+  status: 'add' | 'added' | 'activate' | 'coming-soon';
   onAdd: () => void;
-  onActivate?: () => void;
+  onActivate: () => void;
 }
 
-function BlockStoreCard({ type, isAdded, isInactive, onAdd, onActivate }: BlockStoreCardProps) {
+function BlockCard({ type, status, onAdd, onActivate }: BlockCardProps) {
   const def = BLOCK_DEFINITIONS[type];
   const rawIcon = ICON_MAP[def.icon];
   const Icon = rawIcon as (props: { size: number; className?: string }) => React.ReactElement;
 
+  const isComingSoon = status === 'coming-soon';
+  const isAdded = status === 'added';
+  const isActivate = status === 'activate';
+
   return (
     <div className={cn(
       'rounded-lg border p-3 transition-colors',
-      !def.supported
+      isComingSoon
         ? 'border-zinc-800 bg-zinc-900/50 opacity-60'
         : isAdded
         ? 'border-zinc-700 bg-zinc-800/50'
@@ -104,7 +100,7 @@ function BlockStoreCard({ type, isAdded, isInactive, onAdd, onActivate }: BlockS
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-medium text-zinc-200">{def.label}</span>
-            {!def.supported && (
+            {isComingSoon && (
               <span className="text-[9px] font-medium text-amber-400 bg-amber-400/10 px-1 py-0.5 rounded">Coming soon</span>
             )}
           </div>
@@ -112,75 +108,26 @@ function BlockStoreCard({ type, isAdded, isInactive, onAdd, onActivate }: BlockS
         </div>
       </div>
       <div className="mt-2 flex justify-end">
-        {!def.supported ? (
+        {isComingSoon ? (
           <span className="text-[10px] text-zinc-600 italic">Not yet available</span>
         ) : isAdded ? (
-          isInactive ? (
-            <button
-              onClick={onActivate}
-              className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
-            >
-              <Check size={10} />
-              Activate
-            </button>
-          ) : (
-            <span className="flex items-center gap-1 px-2 py-1 text-[10px] text-zinc-500">
-              <Check size={10} /> Added
-            </span>
-          )
+          <span className="flex items-center gap-1 px-2 py-1 text-[10px] text-zinc-500">
+            <Check size={10} /> Added
+          </span>
+        ) : isActivate ? (
+          <button
+            onClick={onActivate}
+            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-amber-500/10 text-amber-400 hover:bg-amber-500/20 transition-colors"
+          >
+            <Check size={10} />
+            Activate
+          </button>
         ) : (
           <button
             onClick={onAdd}
             className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-blue-600 hover:bg-blue-500 text-white transition-colors"
           >
             <Plus size={10} /> Add
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface CustomBlockStoreCardProps {
-  type: CustomBlockType;
-  isAdded: boolean;
-  onAdd: () => void;
-}
-
-function CustomBlockStoreCard({ type, isAdded, onAdd }: CustomBlockStoreCardProps) {
-  const def = BLOCK_DEFINITIONS[type];
-  const rawIcon = ICON_MAP[def.icon];
-  const Icon = rawIcon as (props: { size: number; className?: string }) => React.ReactElement;
-
-  return (
-    <div className="rounded-lg border border-zinc-700 bg-zinc-800/30 hover:border-zinc-600 hover:bg-zinc-800/50 p-3 transition-colors">
-      <div className="flex items-start gap-2.5">
-        <div className="mt-0.5 text-zinc-400 shrink-0">
-          {Icon({ size: 16, className: '' })}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-medium text-zinc-200">{def.label}</span>
-            {!def.supported && (
-              <span className="text-[9px] font-medium text-amber-400 bg-amber-400/10 px-1 py-0.5 rounded">Coming soon</span>
-            )}
-          </div>
-          <p className="text-[10px] text-zinc-500 mt-0.5 leading-relaxed">{def.description}</p>
-        </div>
-      </div>
-      <div className="mt-2 flex justify-end">
-        {!def.supported ? (
-          <span className="text-[10px] text-zinc-600 italic">Not yet available</span>
-        ) : isAdded && BLOCK_DEFINITIONS[type].unique ? (
-          <span className="flex items-center gap-1 px-2 py-1 text-[10px] text-zinc-500">
-            <Check size={10} /> Added
-          </span>
-        ) : (
-          <button
-            onClick={onAdd}
-            className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-blue-600 hover:bg-blue-500 text-white transition-colors"
-          >
-            <Plus size={10} /> {isAdded ? 'Add Another' : 'Add'}
           </button>
         )}
       </div>
@@ -201,33 +148,48 @@ export function BlockStorePanel({ onClose }: BlockStorePanelProps) {
     if (!layout) return;
     const def = BLOCK_DEFINITIONS[type];
 
-    if (def.unique && hasBlockOfType(layout, type)) return;
-
-    const block = layout.blocks.find((b) => b.type === type);
-    if (block) {
-      // Already exists — activate it
-      const newLayout = toggleBlockActive(layout, block.id);
+    // If already exists and active, no-op
+    const existing = layout.blocks.find((b) => b.type === type);
+    if (existing) {
+      if (existing.active) {
+        // Already active — no-op
+        return;
+      }
+      // Inactive — activate
+      const newLayout = toggleBlockActive(layout, existing.id);
       updateResumeData((prev) => ({ ...prev, resumeLayout: newLayout }));
       toast({ message: `${def.label} activated`, type: 'success' });
-    } else {
-      const newLayout = addBlock(layout, type);
-      updateResumeData((prev) => ({ ...prev, resumeLayout: newLayout }));
-      toast({ message: `${def.label} added`, type: 'success' });
+      return;
     }
+
+    // Add new block
+    const newLayout = addBlock(layout, type);
+    updateResumeData((prev) => ({ ...prev, resumeLayout: newLayout }));
+    toast({ message: `${def.label} added`, type: 'success' });
+  }, [layout, updateResumeData, toast]);
+
+  const handleActivateCoreBlock = useCallback((type: BlockType) => {
+    if (!layout) return;
+    const block = layout.blocks.find((b) => b.type === type);
+    if (!block || block.active) return;
+    const newLayout = toggleBlockActive(layout, block.id);
+    updateResumeData((prev) => ({ ...prev, resumeLayout: newLayout }));
+    const def = BLOCK_DEFINITIONS[type];
+    toast({ message: `${def.label} activated`, type: 'success' });
   }, [layout, updateResumeData, toast]);
 
   const handleAddCustomBlock = useCallback((type: CustomBlockType) => {
-    // Check if a custom block of this type already exists (for unique types)
-      const existingCustom = (resumeData.customBlocks || []).find((b) => b.type === type);
-      if (existingCustom && BLOCK_DEFINITIONS[type].unique) {
-        toast({ message: `${BLOCK_DEFINITIONS[type].label} already exists`, type: 'warning' });
+    const def = BLOCK_DEFINITIONS[type];
+    if (def.unique) {
+      const exists = (resumeData.customBlocks || []).some((b) => b.type === type);
+      if (exists) {
+        toast({ message: `${def.label} already exists`, type: 'warning' });
         return;
       }
-
-      const newResume = addCustomBlock(resumeData, type);
-      updateResumeData(() => newResume);
-      const def = BLOCK_DEFINITIONS[type];
-      toast({ message: `${def.label} added`, type: 'success' });
+    }
+    const newResume = addCustomBlock(resumeData, type);
+    updateResumeData(() => newResume);
+    toast({ message: `${def.label} added`, type: 'success' });
   }, [resumeData, updateResumeData, toast]);
 
   return (
@@ -244,18 +206,14 @@ export function BlockStorePanel({ onClose }: BlockStorePanelProps) {
           <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">Core Sections</div>
           <div className="space-y-1.5">
             {BLOCK_TYPE_GROUPS[0].types.map((type) => {
-              const def = BLOCK_DEFINITIONS[type];
-              const block = layout?.blocks.find((b) => b.type === type);
-              const isAdded = !!block;
-              const isInactive = block && !block.active;
+              const status = getBlockStoreStatus(resumeData, type);
               return (
-                <BlockStoreCard
+                <BlockCard
                   key={type}
                   type={type}
-                  isAdded={isAdded}
-                  isInactive={!!isInactive}
+                  status={status}
                   onAdd={() => handleAddCoreBlock(type)}
-                  onActivate={() => handleAddCoreBlock(type)}
+                  onActivate={() => handleActivateCoreBlock(type)}
                 />
               );
             })}
@@ -267,13 +225,14 @@ export function BlockStorePanel({ onClose }: BlockStorePanelProps) {
           <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">Custom Blocks</div>
           <div className="space-y-1.5">
             {BLOCK_TYPE_GROUPS[1].types.map((type) => {
-              const isAdded = !!(resumeData.customBlocks || []).find((b) => b.type === type);
+              const status = getBlockStoreStatus(resumeData, type);
               return (
-                <CustomBlockStoreCard
+                <BlockCard
                   key={type}
-                  type={type as CustomBlockType}
-                  isAdded={isAdded}
+                  type={type}
+                  status={status}
                   onAdd={() => handleAddCustomBlock(type as CustomBlockType)}
+                  onActivate={() => handleAddCoreBlock(type)}
                 />
               );
             })}
