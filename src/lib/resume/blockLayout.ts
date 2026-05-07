@@ -198,12 +198,36 @@ export function normalizeBlockLayout(resume: Resume): Resume {
     }),
   };
 
+  // Ensure ALL default block types are present (migration for old saved layouts)
+  const defaultLayout = getDefaultBlockLayout();
+  const existingTypes = new Set(layout.blocks.map((b) => b.type));
+  for (const defBlock of defaultLayout.blocks) {
+    if (!existingTypes.has(defBlock.type)) {
+      layout.blocks.push({
+        id: defBlock.id,
+        type: defBlock.type,
+        active: defBlock.active,
+        locked: defBlock.locked,
+        order: layout.blocks.length,
+        settings: getDefaultBlockSettings(defBlock.type),
+      });
+    }
+  }
+
+  // Re-normalize order to be contiguous
+  layout.blocks = layout.blocks
+    .map((b, i) => ({ ...b, order: i }))
+    .sort((a, b) => a.order - b.order);
+
   // Ensure customBlocks exists
   if (!resume.customBlocks) {
     return { ...resume, resumeLayout: layout, customBlocks: [] };
   }
 
-  return { ...resume, resumeLayout: layout };
+  // Deduplicate custom blocks of unique types
+  const deduped = dedupeCustomBlocks({ ...resume, resumeLayout: layout });
+
+  return { ...deduped, resumeLayout: layout };
 }
 
 export function getActiveBlocksInOrder(layout: ResumeLayout): BlockConfig[] {
@@ -368,4 +392,39 @@ export function getCustomBlocksInOrder(resume: Resume): CustomBlock[] {
   if (!resume.resumeLayout?.customBlocksOrder || !resume.customBlocks) return resume.customBlocks || [];
   const byId = new Map(resume.customBlocks.map((b) => [b.id, b]));
   return resume.resumeLayout.customBlocksOrder.map((id) => byId.get(id)).filter(Boolean) as CustomBlock[];
+}
+
+export function dedupeCustomBlocks(resume: Resume): Resume {
+  if (!resume.customBlocks?.length) return resume;
+
+  const seen = new Map<CustomBlockType, string>();
+  const keep: CustomBlock[] = [];
+  const removeIds = new Set<string>();
+
+  for (const block of resume.customBlocks) {
+    const def = BLOCK_DEFINITIONS[block.type as CustomBlockType];
+    if (!def.unique) {
+      keep.push(block);
+      continue;
+    }
+    if (seen.has(block.type as CustomBlockType)) {
+      removeIds.add(block.id);
+    } else {
+      seen.set(block.type as CustomBlockType, block.id);
+      keep.push(block);
+    }
+  }
+
+  if (removeIds.size === 0) return resume;
+
+  const filtered = keep;
+  const order = (resume.resumeLayout?.customBlocksOrder || []).filter((id) => !removeIds.has(id));
+
+  return {
+    ...resume,
+    customBlocks: filtered,
+    resumeLayout: resume.resumeLayout
+      ? { ...resume.resumeLayout, customBlocksOrder: order }
+      : undefined,
+  };
 }

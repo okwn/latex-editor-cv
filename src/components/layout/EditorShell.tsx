@@ -24,6 +24,8 @@ import {
   RefreshCw,
   FileWarning,
   Camera,
+  Zap,
+  ZapOff,
 } from 'lucide-react';
 import type { EditorMode } from '@/lib/resume/editorStore';
 
@@ -142,6 +144,8 @@ export function EditorShell({
     latexSource,
     toggleAiDrawer,
     isDirty,
+    autoCompileEnabled,
+    toggleAutoCompile,
   } = useEditorStore();
 
   const [showSnapshotPanel, setShowSnapshotPanel] = useState(false);
@@ -200,6 +204,20 @@ export function EditorShell({
         >
           <Download size={11} />
           <span className="hidden sm:inline">Export</span>
+        </button>
+
+        <button
+          onClick={toggleAutoCompile}
+          title={autoCompileEnabled ? 'Auto Compile ON — click to disable' : 'Auto Compile OFF — click to enable'}
+          className={cn(
+            'flex items-center gap-1 px-2 py-1.5 rounded text-xs transition-colors',
+            autoCompileEnabled
+              ? 'bg-green-600/20 text-green-400 border border-green-600/30'
+              : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-700'
+          )}
+        >
+          {autoCompileEnabled ? <Zap size={11} /> : <ZapOff size={11} />}
+          <span className="hidden sm:inline">{autoCompileEnabled ? 'Auto On' : 'Auto Off'}</span>
         </button>
 
         <TakeSnapshotButton cvId={cvId} />

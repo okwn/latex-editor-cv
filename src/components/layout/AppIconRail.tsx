@@ -1,19 +1,17 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useEditorStore } from '@/lib/resume/editorStore';
 import {
   LayoutDashboard,
   Blocks,
   PlusSquare,
-  Camera,
+  History,
   Sparkles,
   Settings,
   Eye,
   EyeOff,
-  ChevronLeft,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -24,148 +22,142 @@ interface RailItem {
   href?: string;
   onClick?: () => void;
   active?: boolean;
-  badge?: number;
 }
 
 interface AppIconRailProps {
+  showBlocks: boolean;
+  onToggleBlocks: () => void;
   showPreview?: boolean;
   onTogglePreview?: () => void;
   showBlockStore?: boolean;
   onToggleBlockStore?: () => void;
+  showSnapshots?: boolean;
+  onToggleSnapshots?: () => void;
 }
 
 export function AppIconRail({
+  showBlocks,
+  onToggleBlocks,
   showPreview,
   onTogglePreview,
   showBlockStore,
   onToggleBlockStore,
+  showSnapshots,
+  onToggleSnapshots,
 }: AppIconRailProps) {
-  const router = useRouter();
   const pathname = usePathname();
   const { toggleAiDrawer } = useEditorStore();
 
   const isEditor = pathname?.startsWith('/editor/');
 
-  const items: RailItem[] = [
-    {
-      id: 'dashboard',
-      icon: ({ size, className }) => <LayoutDashboard size={size} className={className} />,
-      label: 'Dashboard',
-      href: '/dashboard',
-    },
-    ...(isEditor
-      ? [
-          {
-            id: 'blocks',
-            icon: ({ size, className }: { size: number; className?: string }) => (
-              <Blocks size={size} className={className} />
-            ),
-            label: 'Blocks',
-            onClick: () => {},
-          },
-        ]
-      : []),
-    ...(isEditor && onToggleBlockStore
-      ? [
-          {
-            id: 'block-store',
-            icon: ({ size, className }: { size: number; className?: string }) => (
-              <PlusSquare size={size} className={className} />
-            ),
-            label: 'Block Store',
-            onClick: onToggleBlockStore,
-            active: showBlockStore,
-          },
-        ]
-      : []),
-    ...(isEditor
-      ? [
-          {
-            id: 'ai',
-            icon: ({ size, className }: { size: number; className?: string }) => (
-              <Sparkles size={size} className={className} />
-            ),
-            label: 'AI Assistant',
-            onClick: () => toggleAiDrawer(),
-          },
-          {
-            id: 'snapshots',
-            icon: ({ size, className }: { size: number; className?: string }) => (
-              <Camera size={size} className={className} />
-            ),
-            label: 'Snapshots',
-            onClick: () => {},
-          },
-        ]
-      : []),
-    {
-      id: 'settings',
-      icon: ({ size, className }: { size: number; className?: string }) => (
-        <Settings size={size} className={className} />
-      ),
-      label: 'Settings',
-      href: '/settings',
-    },
-  ];
-
   return (
     <div className="w-10 bg-zinc-900 border-r border-zinc-800 flex flex-col items-center py-2 gap-1 shrink-0">
-      {items.map((item) => {
-        const Icon = item.icon;
-        const isActive = item.active || (item.href && pathname === item.href);
+      {/* Dashboard — always shown */}
+      <Link
+        href="/dashboard"
+        className={cn(
+          'w-full flex items-center justify-center py-2.5 rounded transition-all',
+          pathname === '/dashboard'
+            ? 'bg-amber-500/10 text-amber-400'
+            : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
+        )}
+        title="Dashboard"
+      >
+        <LayoutDashboard size={16} />
+      </Link>
 
-        if (item.href) {
-          return (
-            <Link
-              key={item.id}
-              href={item.href}
-              className={cn(
-                'w-full flex items-center justify-center py-2.5 rounded transition-all',
-                isActive
-                  ? 'bg-amber-500/10 text-amber-400'
-                  : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
-              )}
-              title={item.label}
-            >
-              <Icon size={16} className={isActive ? 'text-amber-400' : ''} />
-            </Link>
-          );
-        }
+      {/* Editor-only icons */}
+      {isEditor && (
+        <>
+          <div className="w-6 border-t border-zinc-800 my-1" />
 
-        return (
+          {/* Blocks toggle */}
           <button
-            key={item.id}
-            onClick={item.onClick}
+            onClick={onToggleBlocks}
             className={cn(
               'w-full flex items-center justify-center py-2.5 rounded transition-all',
-              item.active
+              showBlocks
                 ? 'bg-amber-500/10 text-amber-400'
                 : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
             )}
-            title={item.label}
+            title="Blocks"
           >
-            <Icon size={16} className={item.active ? 'text-amber-400' : ''} />
+            <Blocks size={16} />
           </button>
-        );
-      })}
 
-      {isEditor && onTogglePreview && (
-        <>
-          <div className="flex-1" />
+          {/* Block Store */}
           <button
-            onClick={onTogglePreview}
+            onClick={onToggleBlockStore}
             className={cn(
               'w-full flex items-center justify-center py-2.5 rounded transition-all',
-              showPreview
-                ? 'bg-zinc-700 text-zinc-200'
+              showBlockStore
+                ? 'bg-amber-500/10 text-amber-400'
                 : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
             )}
-            title={showPreview ? 'Hide Preview' : 'Show Preview'}
+            title="Block Store"
           >
-            {showPreview ? <EyeOff size={16} /> : <Eye size={16} />}
+            <PlusSquare size={16} />
           </button>
+
+          {/* Snapshots */}
+          {onToggleSnapshots && (
+            <button
+              onClick={onToggleSnapshots}
+              className={cn(
+                'w-full flex items-center justify-center py-2.5 rounded transition-all',
+                showSnapshots
+                  ? 'bg-amber-500/10 text-amber-400'
+                  : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
+              )}
+              title="Snapshots"
+            >
+              <History size={16} />
+            </button>
+          )}
+
+          {/* AI */}
+          <button
+            onClick={toggleAiDrawer}
+            className="w-full flex items-center justify-center py-2.5 rounded text-zinc-500 hover:bg-zinc-800 hover:text-amber-400 transition-all"
+            title="AI Assistant"
+          >
+            <Sparkles size={16} />
+          </button>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Preview toggle */}
+          {onTogglePreview && (
+            <button
+              onClick={onTogglePreview}
+              className={cn(
+                'w-full flex items-center justify-center py-2.5 rounded transition-all',
+                showPreview
+                  ? 'bg-zinc-700 text-zinc-200'
+                  : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
+              )}
+              title={showPreview ? 'Hide Preview' : 'Show Preview'}
+            >
+              {showPreview ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          )}
         </>
       )}
+
+      {/* Settings — always shown */}
+      <Link
+        href="/settings"
+        className={cn(
+          'mt-auto w-full flex items-center justify-center py-2.5 rounded transition-all',
+          pathname === '/settings'
+            ? 'bg-amber-500/10 text-amber-400'
+            : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
+        )}
+        title="Settings"
+      >
+        <Settings size={16} />
+      </Link>
     </div>
   );
 }

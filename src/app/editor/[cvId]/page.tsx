@@ -13,6 +13,7 @@ import { normalizeBlockLayout } from '@/lib/resume/blockLayout';
 import { useKeyboardShortcuts } from '@/components/ui/useKeyboardShortcuts';
 import { useToast } from '@/components/ui/Toast';
 import { ToastContainer } from '@/components/ui/Toast';
+import { AutoCompileManager } from '@/components/editor/AutoCompileManager';
 import { PdfPreviewSkeleton, EditorSkeleton } from '@/components/ui/Skeletons';
 import { AiDrawer } from '@/components/layout/AiDrawer';
 import {
@@ -290,6 +291,8 @@ export default function EditorPage() {
         {/* Sidebar icon rail */}
         <Panel id="sidebar" defaultSize={5} minSize={4} maxSize={8} collapsible>
           <AppIconRail
+            showBlocks={showBlocks}
+            onToggleBlocks={handleToggleBlocks}
             showPreview={showPreview}
             onTogglePreview={handleTogglePreview}
             showBlockStore={showBlockStore}
@@ -297,7 +300,6 @@ export default function EditorPage() {
           />
         </Panel>
 
-        {/* Resize handle */}
         <Separator className="w-1 bg-zinc-800 hover:bg-amber-500/40 transition-colors cursor-col-resize flex items-center justify-center">
           <div className="w-px h-8 bg-zinc-600/50" />
         </Separator>
@@ -305,8 +307,8 @@ export default function EditorPage() {
         {/* Block editor — only when visible */}
         {showBlocks && (
           <>
-            <Panel id="blocks" defaultSize={showLatex ? 30 : showPreview ? 35 : 60} minSize={20}>
-              <div className="h-full overflow-y-auto">
+            <Panel id="blocks" defaultSize={28} minSize={18} maxSize={40} collapsible collapsedSize={0}>
+              <div className="h-full overflow-y-auto min-w-0">
                 <div className="p-3">
                   <BlockEditorRouter />
                 </div>
@@ -323,7 +325,7 @@ export default function EditorPage() {
         {/* LaTeX editor — only when visible */}
         {showLatex && (
           <>
-            {showBlocks && (
+            {!showBlocks && (
               <Separator className="w-1 bg-zinc-800 hover:bg-amber-500/40 transition-colors cursor-col-resize flex items-center justify-center">
                 <div className="w-px h-8 bg-zinc-600/50" />
               </Separator>
@@ -354,6 +356,7 @@ export default function EditorPage() {
       </Group>
 
       <AiDrawer />
+      <AutoCompileManager />
       <ToastContainer />
 
       {/* Block store panel */}

@@ -32,6 +32,7 @@ import { registerTemplate } from './templateRegistry';
 import { escapeLatex, escapeLatexForUrl } from '@/lib/latex/escapeLatex';
 import type {
   ResumeLayout,
+  BlockConfig,
   BlockType,
   HeaderSettings,
   SummarySettings,
@@ -40,6 +41,7 @@ import type {
   ProjectSettings,
   CertificationSettings,
 } from '@/types/blockLayout';
+import { BLOCK_DEFINITIONS } from '@/types/blockLayout';
 
 interface BlockVisibility {
   header: boolean;
@@ -223,6 +225,120 @@ function spacingValue(spacing: 'compact' | 'normal' | 'relaxed', base: string, f
   return base;
 }
 
+interface RenderData {
+  name: string;
+  role: string;
+  email: string;
+  github: string;
+  linkedin: string;
+  website: string;
+  phone: string;
+  summaryText: string;
+  eduItems: { degree: string; institution: string; city: string; startYear: string; endYear: string; status: string }[];
+  skillItems: { groupName: string; skills: string[] }[];
+  displayProjects: { title: string; yearRange: string; linkLabel: string; linkUrl: string; description: string; tags: string[]; priority: string }[];
+  focusItems: string[];
+  certItems: string[];
+}
+
+function renderBlockSection(
+  block: BlockConfig,
+  vis: BlockVisibility,
+  hs: HeaderSettings,
+  ss: SummarySettings,
+  es: EducationSettings,
+  sk: SkillsSettings,
+  ps: ProjectSettings,
+  cs: CertificationSettings,
+  data: RenderData
+): string {
+  const type = block.type;
+  const activeKey = type as keyof BlockVisibility;
+  if (!vis[activeKey]) return '';
+
+  switch (type) {
+    case 'header': {
+      const alignEnv = hs.alignment === 'left' ? '\\begin{flushleft}' : hs.alignment === 'right' ? '\\begin{flushright}' : '\\begin{center}';
+      const alignEnd = hs.alignment === 'left' ? '\\end{flushleft}' : hs.alignment === 'right' ? '\\end{flushright}' : '\\end{center}';
+      const nameSize = hs.nameSize === 'large' ? '\\Large' : hs.nameSize === 'compact' ? '\\large' : '\\LARGE';
+      let tex = `% KCV-BLOCK: header\n${alignEnv}\n\\cvname{${nameSize}}{${data.name}}\n\\cvrole{${data.role}}\n\n\\begin{tabular}{l}\n`;
+      if (hs.showEmail) tex += `\\contactitem{Envelope}{Email}{${data.email}}\n`;
+      if (hs.showGithub) tex += `\\contactitem{Github}{GitHub}{${data.github}}\n`;
+      if (hs.showLinkedin && data.linkedin) tex += `\\contactitem{Linkedin}{LinkedIn}{${data.linkedin}}\n`;
+      if (hs.showWebsite && data.website) tex += `\\contactitem{Globe}{Web}{${data.website}}\n`;
+      if (hs.showPhone && data.phone) tex += `\\contactitem{Phone}{Tel}{${data.phone}}\n`;
+      tex += `\\end{tabular}\n\\vspace{1em}\n${alignEnd}\n\n`;
+      return tex;
+    }
+    case 'summary': {
+      const alignCmd = ss.alignment === 'justified' ? '\\justifying' : '';
+      return `% KCV-BLOCK: summary\n\\section{Summary}\n${alignCmd}${data.summaryText}\n\n`;
+    }
+    case 'education': {
+      if (!data.eduItems.length) return '';
+      const eduVspace = spacingValue(es.spacing, '0.4em', 0);
+      let tex = `% KCV-BLOCK: education\n\\section{Education}\n`;
+      if (es.columns === 2) tex += '\\begin{multicols}{2}\\raggedcolumns\n';
+      for (const edu of data.eduItems) {
+        tex += `\\vspace{${eduVspace}}\n\\textbf{${edu.degree}} \\hfill ${edu.startYear}--${edu.endYear}${edu.status ? ` (${edu.status})` : ''}\n\\\\\n\\textit{${edu.institution}}${edu.city ? `, ${edu.city}` : ''}\n\\\\\n`;
+      }
+      if (es.columns === 2) tex += '\\end{multicols}\n';
+      tex += '\\vspace{0.5em}\n\n';
+      return tex;
+    }
+    case 'skills': {
+      if (!data.skillItems.length) return '';
+      let tex = `% KCV-BLOCK: skills\n\\section{Skills}\n`;
+      for (const group of data.skillItems) {
+        tex += `\\skillgroup{${group.groupName}}{${group.skills.join(', ')}}\n`;
+      }
+      tex += '\\vspace{0.5em}\n\n';
+      return tex;
+    }
+    case 'projects': {
+      if (!data.displayProjects.length) return '';
+      const projVspace = spacingValue(ps.spacing, '0.5em', 0);
+      const boxSep = ps.cardSize === 'compact' ? '2pt' : ps.cardSize === 'large' ? '8pt' : '4pt';
+      let tex = `% KCV-BLOCK: projects\n\\section{Projects}\n`;
+      if (ps.columns > 1) tex += `\\begin{multicols}{${ps.columns}}\\raggedcolumns\n`;
+      for (const proj of data.displayProjects) {
+        const linkPart = ps.showLinks && proj.linkUrl
+          ? `\\href{${proj.linkUrl}}{${proj.linkLabel}}`
+          : escapeLatex(proj.linkLabel);
+        const tagsPart = ps.showTags && proj.tags.length > 0 ? `\\\\[${projVspace}]\\textit{${proj.tags.join(', ')}}` : '';
+        tex += `\\begin{tcolorbox}[colback=kcvsoft, colframe=kcvlightgray, arc=4pt, boxsep=${boxSep}]\n\\textbf{${proj.title}} \\hfill ${proj.yearRange}\n\\\\\n${linkPart}\n\\\\\n\\textit{${proj.description}}${tagsPart}\n\\end{tcolorbox}\n\\vspace{${projVspace}}\n`;
+      }
+      if (ps.columns > 1) tex += '\\end{multicols}\n';
+      tex += '\\vspace{0.5em}\n\n';
+      return tex;
+    }
+    case 'focusAreas': {
+      if (!data.focusItems.length) return '';
+      let tex = `% KCV-BLOCK: focus\n\\section{Focus Areas}\n\\begin{itemize}\n`;
+      for (const area of data.focusItems) {
+        tex += `\\item ${area}\n`;
+      }
+      tex += '\\end{itemize}\n\\vspace{0.5em}\n\n';
+      return tex;
+    }
+    case 'certifications': {
+      if (!data.certItems.length) return '';
+      let tex = `% KCV-BLOCK: certifications\n\\section{Certifications}\n`;
+      if (cs.columns > 1) tex += `\\begin{multicols}{${cs.columns}}\\raggedcolumns\n`;
+      tex += '\\begin{itemize}\n';
+      for (const cert of data.certItems) {
+        tex += `\\item ${cert}\n`;
+      }
+      tex += '\\end{itemize}\n';
+      if (cs.columns > 1) tex += '\\end{multicols}\n';
+      tex += '\\vspace{0.5em}\n\n';
+      return tex;
+    }
+    default:
+      return '';
+  }
+}
+
 function renderKcvModern(resume: Resume): string {
   const { personal, summary, education, skillGroups, projects, focusAreas, certifications, resumeLayout } = resume;
   const vis = getBlockVisibility(resumeLayout);
@@ -239,7 +355,6 @@ function renderKcvModern(resume: Resume): string {
   const github = escapeLatex(personal.github);
   const linkedin = personal.linkedin ? escapeLatex(personal.linkedin) : '';
   const website = personal.website ? escapeLatex(personal.website) : '';
-  const location = personal.location ? escapeLatex(personal.location) : '';
   const phone = personal.phone ? escapeLatex(personal.phone) : '';
 
   const summaryText = escapeLatex(summary.professionalSummary);
@@ -276,6 +391,24 @@ function renderKcvModern(resume: Resume): string {
 
   const preamble = kcvTemplatePreamble(defaultTemplateConfig);
 
+  const sortedBlocks = [...(resumeLayout?.blocks ?? [])].sort((a, b) => a.order - b.order);
+
+  const data: RenderData = {
+    name,
+    role,
+    email,
+    github,
+    linkedin,
+    website,
+    phone,
+    summaryText,
+    eduItems,
+    skillItems,
+    displayProjects,
+    focusItems,
+    certItems,
+  };
+
   let tex = `\\documentclass[11pt,a4paper]{article}
 ${preamble}
 
@@ -284,134 +417,11 @@ ${preamble}
 \\setstretch{1.1}
 `;
 
-  if (vis.header) {
-    const alignEnv = hs.alignment === 'left' ? '\\begin{flushleft}' : hs.alignment === 'right' ? '\\begin{flushright}' : '';
-    const alignEnd = hs.alignment === 'left' ? '\\end{flushleft}' : hs.alignment === 'right' ? '\\end{flushright}' : '';
-    const nameSize = hs.nameSize === 'large' ? '\\Large' : hs.nameSize === 'compact' ? '\\large' : '\\LARGE';
-
-    tex += `% KCV-BLOCK: header
-${alignEnv}
-\\cvname{${nameSize}}{${name}}
-\\cvrole{${role}}
-
-\\begin{tabular}{l}
-`;
-    if (hs.showEmail) tex += `\\contactitem{Envelope}{Email}{${email}}\n`;
-    if (hs.showGithub) tex += `\\contactitem{Github}{GitHub}{${github}}\n`;
-    if (hs.showLinkedin && linkedin) tex += `\\contactitem{Linkedin}{LinkedIn}{${linkedin}}\n`;
-    if (hs.showWebsite && website) tex += `\\contactitem{Globe}{Web}{${website}}\n`;
-    if (hs.showPhone && phone) tex += `\\contactitem{Phone}{Tel}{${phone}}\n`;
-    tex += `\\end{tabular}
-\\vspace{1em}
-${alignEnd}
-
-`;
-  }
-
-  if (vis.summary && summaryText.trim()) {
-    const alignCmd = ss.alignment === 'justified' ? '\\justifying' : '';
-    tex += `% KCV-BLOCK: summary
-\\section{Summary}
-${alignCmd}${summaryText}
-
-`;
-  }
-
-  if (vis.education && eduItems.length > 0) {
-    const eduVspace = spacingValue(es.spacing, '0.4em', 0);
-    tex += `% KCV-BLOCK: education
-\\section{Education}
-`;
-    if (es.columns === 2) tex += '\\begin{multicols}{2}\\raggedcolumns\n';
-    for (const edu of eduItems) {
-      tex += `\\vspace{${eduVspace}}
-\\textbf{${edu.degree}} \\hfill ${edu.startYear}--${edu.endYear}${edu.status ? ` (${edu.status})` : ''}
-\\\\
-\\textit{${edu.institution}}${edu.city ? `, ${edu.city}` : ''}
-\\\\
-`;
-    }
-    if (es.columns === 2) tex += '\\end{multicols}\n';
-    tex += `\\vspace{0.5em}
-
-`;
-  }
-
-  if (vis.skills && skillItems.length > 0) {
-    const skVspace = spacingValue(sk.spacing, '0.3em', 0);
-    tex += `% KCV-BLOCK: skills
-\\section{Skills}
-`;
-    for (const group of skillItems) {
-      tex += `\\skillgroup{${group.groupName}}{${group.skills.join(', ')}}\n`;
-    }
-    tex += `\\vspace{0.5em}
-
-`;
-  }
-
-  if (vis.projects && displayProjects.length > 0) {
-    const projVspace = spacingValue(ps.spacing, '0.5em', 0);
-    const boxSep = ps.cardSize === 'compact' ? '2pt' : ps.cardSize === 'large' ? '8pt' : '4pt';
-    const fontSize = ps.cardSize === 'compact' ? '\\small' : ps.cardSize === 'large' ? '' : '';
-    tex += `% KCV-BLOCK: projects
-\\section{Projects}
-`;
-    if (ps.columns > 1) tex += `\\begin{multicols}{${ps.columns}}\\raggedcolumns\n`;
-    for (const proj of displayProjects) {
-      const linkPart = ps.showLinks && proj.linkUrl
-        ? `\\href{${proj.linkUrl}}{${proj.linkLabel}}`
-        : escapeLatex(proj.linkLabel);
-      const tagsPart = ps.showTags && proj.tags.length > 0 ? `\\\\[${projVspace}]\\textit{${proj.tags.join(', ')}}` : '';
-      tex += `\\begin{tcolorbox}[colback=kcvsoft, colframe=kcvlightgray, arc=4pt, boxsep=${boxSep}]
-\\textbf{${proj.title}} \\hfill ${proj.yearRange}
-\\\\
-${linkPart}
-\\\\
-\\textit{${proj.description}}${tagsPart}
-\\end{tcolorbox}
-\\vspace{${projVspace}}
-`;
-    }
-    if (ps.columns > 1) tex += '\\end{multicols}\n';
-    tex += `\\vspace{0.5em}
-
-`;
-  }
-
-  if (vis.focusAreas && focusItems.length > 0) {
-    tex += `% KCV-BLOCK: focus
-\\section{Focus Areas}
-\\begin{itemize}
-`;
-    for (const area of focusItems) {
-      tex += `\\item ${area}\n`;
-    }
-    tex += `\\end{itemize}
-\\vspace{0.5em}
-
-`;
-  }
-
-  if (vis.certifications && certItems.length > 0) {
-    const certVspace = spacingValue(cs.spacing, '0.4em', 0);
-    tex += `% KCV-BLOCK: certifications
-\\section{Certifications}
-`;
-    if (cs.columns > 1) tex += `\\begin{multicols}{${cs.columns}}\\raggedcolumns\n`;
-    tex += '\\begin{itemize}\n';
-    for (const cert of certItems) {
-      tex += `\\item ${cert}\n`;
-    }
-    tex += '\\end{itemize}\n';
-    if (cs.columns > 1) tex += '\\end{multicols}\n';
-    tex += `\\vspace{0.5em}
-
-`;
+  for (const block of sortedBlocks) {
+    tex += renderBlockSection(block, vis, hs, ss, es, sk, ps, cs, data);
   }
 
   tex += `\\end{document}`;
-  // Append custom blocks in configured order
   tex = renderCustomBlocks(tex, resume);
   return tex;
 }

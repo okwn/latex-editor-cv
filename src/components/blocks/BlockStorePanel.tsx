@@ -212,10 +212,17 @@ export function BlockStorePanel({ onClose }: BlockStorePanelProps) {
   }, [layout, updateResumeData, toast]);
 
   const handleAddCustomBlock = useCallback((type: CustomBlockType) => {
-    const newResume = addCustomBlock(resumeData, type);
-    updateResumeData(() => newResume);
-    const def = BLOCK_DEFINITIONS[type];
-    toast({ message: `${def.label} block added`, type: 'success' });
+    // Check if a custom block of this type already exists (for unique types)
+      const existingCustom = (resumeData.customBlocks || []).find((b) => b.type === type);
+      if (existingCustom && BLOCK_DEFINITIONS[type].unique) {
+        toast({ message: `${BLOCK_DEFINITIONS[type].label} already exists`, type: 'warning' });
+        return;
+      }
+
+      const newResume = addCustomBlock(resumeData, type);
+      updateResumeData(() => newResume);
+      const def = BLOCK_DEFINITIONS[type];
+      toast({ message: `${def.label} added`, type: 'success' });
   }, [resumeData, updateResumeData, toast]);
 
   return (

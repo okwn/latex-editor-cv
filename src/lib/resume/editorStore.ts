@@ -71,6 +71,8 @@ interface EditorState {
   autoCompileAfterAi: boolean;
   currentTemplateId: string;
   lastPdfUrl: string | null;
+  // Auto compile
+  autoCompileEnabled: boolean;
   // Actions
   setResumeData: (resume: Resume) => void;
   updateResumeData: (updater: (prev: Resume) => Resume) => void;
@@ -97,6 +99,8 @@ interface EditorState {
   markDirty: (reason: string) => void;
   setShowLatexPanel: (show: boolean) => void;
   toggleShowLatexPanel: () => void;
+  setAutoCompileEnabled: (enabled: boolean) => void;
+  toggleAutoCompile: () => void;
   bootstrap: () => void;
 }
 
@@ -190,6 +194,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   autoCompileAfterAi: false,
   currentTemplateId: initialTemplateId,
   lastPdfUrl: getLastPdfUrl(),
+  autoCompileEnabled: false,
 
   setResumeData: (resume) => set({ resumeData: resume }),
 
@@ -368,4 +373,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setShowLatexPanel: (show) => set({ showLatexPanel: show }),
 
   toggleShowLatexPanel: () => set((state) => ({ showLatexPanel: !state.showLatexPanel })),
+
+  setAutoCompileEnabled: (enabled) => set({ autoCompileEnabled: enabled }),
+
+  toggleAutoCompile: () => set((state) => ({ autoCompileEnabled: !state.autoCompileEnabled })),
 }));
