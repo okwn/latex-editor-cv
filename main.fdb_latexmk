@@ -1,0 +1,16 @@
+# Fdb version 4
+["pdflatex"] 1778171859.35067 "/tmp/kcv-k7LtXA/main.tex" "main.pdf" "main" 1778171859.48264 0
+  "/tmp/kcv-k7LtXA/main.tex" 1778171859.28939 64 9a2b69ba1623f68fad7dd7a3445f5570 ""
+  "/usr/share/texmf-dist/fonts/type1/public/amsfonts/cm/cmr10.pfb" 1775415801 35752 024fb6c41858982481f6968b5fc26508 ""
+  "/usr/share/texmf-dist/tex/latex/base/article.cls" 1775415801 20144 b966087dda3b194755eb460d32e2ef75 ""
+  "/usr/share/texmf-dist/tex/latex/base/size10.clo" 1775415801 8448 686612a86f0e04f41ea577f5ec7e83d8 ""
+  "/usr/share/texmf-dist/tex/latex/l3backend/l3backend-pdftex.def" 1775415801 30662 bfd6e864f4ffc5018b0e2b6260c3181c ""
+  "/usr/share/texmf-dist/web2c/texmf.cnf" 1775415801 43569 fd570f2fa160877d211e859f687312ba ""
+  "/var/lib/texmf/fonts/map/pdftex/updmap/pdftex.map" 1778170810 5380826 a3bfff71f433a54f017bc880f3b8ea78 ""
+  "/var/lib/texmf/web2c/pdftex/pdflatex.fmt" 1778170807 3084555 662b68952490d3c4c6af72a86af3dacd ""
+  "main.aux" 1778171859.47238 32 3985256e7290058c681f74d7a3565a19 "pdflatex"
+  (generated)
+  "main.aux"
+  "main.log"
+  "main.pdf"
+  (rewritten before read)

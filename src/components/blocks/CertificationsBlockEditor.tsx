@@ -1,0 +1,69 @@
+'use client';
+
+import { useEditorStore } from '@/lib/resume/editorStore';
+import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
+
+export function CertificationsBlockEditor() {
+  const { resumeData, setResumeData } = useEditorStore();
+  const { certifications } = resumeData;
+
+  const update = (index: number, value: string) => {
+    const updated = certifications.map((item, i) => (i === index ? value : item));
+    setResumeData({ ...resumeData, certifications: updated });
+  };
+
+  const add = () => {
+    setResumeData({ ...resumeData, certifications: [...certifications, ''] });
+  };
+
+  const remove = (index: number) => {
+    setResumeData({ ...resumeData, certifications: certifications.filter((_, i) => i !== index) });
+  };
+
+  const move = (index: number, direction: 'up' | 'down') => {
+    if (
+      (direction === 'up' && index === 0) ||
+      (direction === 'down' && index === certifications.length - 1)
+    )
+      return;
+    const updated = [...certifications];
+    const target = direction === 'up' ? index - 1 : index + 1;
+    [updated[index], updated[target]] = [updated[target], updated[index]];
+    setResumeData({ ...resumeData, certifications: updated });
+  };
+
+  return (
+    <div className="space-y-4 px-1">
+      <p className="text-xs text-zinc-500">List your professional certifications and credentials. Shown in a 3-column layout in the CV.</p>
+
+      {certifications.map((cert, i) => (
+        <div key={i} className="flex items-center gap-2">
+          <input
+            type="text"
+            value={cert}
+            onChange={(e) => update(i, e.target.value)}
+            className="flex-1 bg-zinc-800 border border-zinc-700 rounded-md px-3 py-1.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/50"
+            placeholder="AWS Certified Solutions Architect – Professional (SAP-C02)"
+          />
+          <button onClick={() => move(i, 'up')} className="p-1 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300">
+            <ChevronUp size={12} />
+          </button>
+          <button onClick={() => move(i, 'down')} className="p-1 rounded hover:bg-zinc-700 text-zinc-500 hover:text-zinc-300">
+            <ChevronDown size={12} />
+          </button>
+          <button onClick={() => remove(i)} className="p-1 rounded hover:bg-zinc-700 text-red-400/70 hover:text-red-400">
+            <Trash2 size={12} />
+          </button>
+        </div>
+      ))}
+
+      <button
+        onClick={add}
+        className="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-md border border-dashed border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 transition-colors text-xs"
+      >
+        <Plus size={12} />
+        Add Certification
+      </button>
+    </div>
+  );
+}

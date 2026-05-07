@@ -1,0 +1,9 @@
+# Fdb version 4
+["pdflatex"] 0 "/tmp/test-cv.tex" "test-cv.pdf" "test-cv" 0 -1
+  "/tmp/test-cv.tex" 0 -1 0 ""
+  "test-cv.aux" 0 -1 0 "pdflatex"
+  (generated)
+  "test-cv.aux"
+  "test-cv.log"
+  "test-cv.pdf"
+  (rewritten before read)
