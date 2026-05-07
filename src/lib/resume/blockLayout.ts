@@ -234,6 +234,30 @@ export function getActiveBlocksInOrder(layout: ResumeLayout): BlockConfig[] {
   return [...layout.blocks].sort((a, b) => a.order - b.order).filter((b) => b.active);
 }
 
+// Returns ALL blocks (active + inactive) sorted by order, for navigation display
+export function getBlocksInOrder(layout: ResumeLayout): BlockConfig[] {
+  return [...layout.blocks].sort((a, b) => a.order - b.order);
+}
+
+// Returns blocks from both layout (core) and customBlocks (custom), sorted by order
+export function getAllBlocksInOrder(resume: Resume): (BlockConfig | CustomBlock)[] {
+  const layout = resume.resumeLayout;
+  const core = layout ? getBlocksInOrder(layout) : [];
+
+  const customBlocks = resume.customBlocks || [];
+  const customOrder = layout?.customBlocksOrder || [];
+  const customSorted = [...customBlocks].sort((a, b) => {
+    const ai = customOrder.indexOf(a.id);
+    const bi = customOrder.indexOf(b.id);
+    if (ai === -1 && bi === -1) return 0;
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  return [...core, ...customSorted];
+}
+
 export function getBlockById(layout: ResumeLayout, blockId: string): BlockConfig | undefined {
   return layout.blocks.find((b) => b.id === blockId);
 }
