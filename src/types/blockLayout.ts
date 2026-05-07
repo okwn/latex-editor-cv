@@ -11,7 +11,17 @@ export type BlockType =
   | 'awards'
   | 'links'
   | 'experience'
-  | 'publications';
+  | 'publications'
+  | 'tools'
+  | 'softSkills'
+  | 'courses'
+  | 'openSource'
+  | 'interests'
+  | 'volunteer'
+  | 'patents'
+  | 'talks'
+  | 'caseStudies'
+  | 'references';
 
 export type HeaderAlignment = 'left' | 'center' | 'right';
 export type NameSize = 'compact' | 'normal' | 'large';
@@ -27,7 +37,7 @@ export type CertificationColumns = 1 | 2 | 3;
 export type CertificationSpacing = 'compact' | 'normal' | 'relaxed';
 export type SummaryAlignment = 'left' | 'justified';
 export type SummarySpacing = 'compact' | 'normal' | 'relaxed';
-export type CustomBlockType = 'customText' | 'languages' | 'awards' | 'links' | 'experience' | 'publications';
+export type CustomBlockType = 'customText' | 'languages' | 'awards' | 'links' | 'experience' | 'publications' | 'tools' | 'softSkills' | 'courses' | 'openSource' | 'interests' | 'volunteer' | 'patents' | 'talks' | 'caseStudies' | 'references';
 
 export interface BlockConfig {
   id: string;
@@ -92,6 +102,7 @@ export const BLOCK_DEFINITIONS: Record<
     label: string;
     description: string;
     icon: string;
+    category: 'core' | 'career' | 'skills' | 'portfolio' | 'credentials' | 'extra';
     removable: boolean;
     defaultActive: boolean;
     defaultLocked: boolean;
@@ -99,19 +110,38 @@ export const BLOCK_DEFINITIONS: Record<
     unique: boolean;
   }
 > = {
-  header: { label: 'Header', description: 'Your name, role, and contact info', icon: 'user', removable: false, defaultActive: true, defaultLocked: true, supported: true, unique: true },
-  summary: { label: 'Professional Summary', description: 'A brief overview of your experience', icon: 'file-text', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
-  education: { label: 'Education', description: 'Degrees, institutions, and achievements', icon: 'graduation-cap', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
-  skills: { label: 'Technical Skills', description: 'Organized skill groups by category', icon: 'wrench', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
-  projects: { label: 'Selected Projects', description: 'Highlight your best work with cards', icon: 'folder-git2', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
-  focusAreas: { label: 'Focus Areas', description: 'Areas of expertise or interest', icon: 'target', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
-  certifications: { label: 'Certifications', description: 'Professional certifications and badges', icon: 'award', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
-  customText: { label: 'Custom Text Block', description: 'Add a free-form text section', icon: 'align-left', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: false },
-  languages: { label: 'Languages', description: 'Spoken languages with proficiency', icon: 'globe', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
-  awards: { label: 'Awards', description: 'Honors, awards, and recognitions', icon: 'trophy', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
-  links: { label: 'Links', description: 'Important URLs and online profiles', icon: 'link', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
-  experience: { label: 'Experience', description: 'Work history placeholder', icon: 'briefcase', removable: true, defaultActive: true, defaultLocked: false, supported: false, unique: false },
-  publications: { label: 'Publications', description: 'Papers, articles, and research', icon: 'book-open', removable: true, defaultActive: true, defaultLocked: false, supported: false, unique: false },
+  // Core
+  header: { label: 'Header', description: 'Your name, role, and contact info', icon: 'user', category: 'core', removable: false, defaultActive: true, defaultLocked: true, supported: true, unique: true },
+  summary: { label: 'Professional Summary', description: 'A brief overview of your experience and goals', icon: 'file-text', category: 'core', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
+  education: { label: 'Education', description: 'Degrees, institutions, and achievements', icon: 'graduation-cap', category: 'core', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
+  skills: { label: 'Technical Skills', description: 'Organized skill groups by category', icon: 'wrench', category: 'core', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
+  projects: { label: 'Selected Projects', description: 'Highlight your best work with cards', icon: 'folder-git2', category: 'core', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
+  focusAreas: { label: 'Focus Areas', description: 'Areas of expertise or interest', icon: 'target', category: 'core', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
+  certifications: { label: 'Certifications', description: 'Professional certifications and badges', icon: 'award', category: 'credentials', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
+
+  // Career
+  experience: { label: 'Work Experience', description: 'Full-time roles, positions, and responsibilities', icon: 'briefcase', category: 'career', removable: true, defaultActive: true, defaultLocked: false, supported: false, unique: false },
+  volunteer: { label: 'Volunteer Experience', description: 'Community service and volunteering', icon: 'heart', category: 'career', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: false },
+
+  // Skills
+  languages: { label: 'Languages', description: 'Spoken languages with proficiency levels', icon: 'globe', category: 'skills', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
+  tools: { label: 'Tools', description: 'Software, platforms, and tooling you use', icon: 'tool', category: 'skills', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: true },
+  softSkills: { label: 'Soft Skills', description: 'Interpersonal and communication skills', icon: 'users', category: 'skills', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: true },
+
+  // Portfolio
+  links: { label: 'Links', description: 'Important URLs and online profiles', icon: 'link', category: 'portfolio', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
+  publications: { label: 'Publications', description: 'Papers, articles, and research', icon: 'book-open', category: 'portfolio', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: false },
+  talks: { label: 'Talks', description: 'Conference talks, presentations, and webinars', icon: 'mic', category: 'portfolio', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: false },
+  openSource: { label: 'Open Source', description: 'Your open source contributions', icon: 'code', category: 'portfolio', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: true },
+  caseStudies: { label: 'Case Studies', description: 'Detailed project analyses and outcomes', icon: 'bar-chart', category: 'portfolio', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: false },
+
+  // Credentials/Extra
+  awards: { label: 'Awards', description: 'Honors, awards, and recognitions', icon: 'trophy', category: 'credentials', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: true },
+  courses: { label: 'Courses', description: 'Completed courses and training programs', icon: 'book', category: 'credentials', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: true },
+  patents: { label: 'Patents', description: 'Patents filed or granted', icon: 'file-sign', category: 'credentials', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: false },
+  references: { label: 'References', description: 'Professional references and testimonials', icon: 'quote', category: 'credentials', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: true },
+  interests: { label: 'Interests', description: 'Hobbies, causes, and personal interests', icon: 'star', category: 'extra', removable: true, defaultActive: false, defaultLocked: false, supported: false, unique: true },
+  customText: { label: 'Custom Text', description: 'Add a free-form text section with custom content', icon: 'align-left', category: 'extra', removable: true, defaultActive: true, defaultLocked: false, supported: true, unique: false },
 };
 
 export type BlockDirection = 'up' | 'down';

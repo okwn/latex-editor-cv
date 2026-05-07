@@ -50,7 +50,7 @@ export interface Certifications {
   certifications: string[];
 }
 
-export type CustomBlockType = 'customText' | 'languages' | 'awards' | 'links' | 'experience' | 'publications';
+export type CustomBlockType = 'customText' | 'languages' | 'awards' | 'links' | 'experience' | 'publications' | 'tools' | 'softSkills' | 'courses' | 'openSource' | 'interests' | 'volunteer' | 'patents' | 'talks' | 'caseStudies' | 'references';
 
 export interface CustomTextBlock {
   id: string;
@@ -94,13 +94,53 @@ export interface PublicationsBlock {
   items: { title: string; venue: string; year: string; url?: string }[];
 }
 
+export interface ToolsBlock {
+  id: string;
+  type: 'tools';
+  title: string;
+  items: string[];
+}
+
+export interface SoftSkillsBlock {
+  id: string;
+  type: 'softSkills';
+  title: string;
+  items: string[];
+}
+
+export interface CoursesBlock {
+  id: string;
+  type: 'courses';
+  title: string;
+  items: { name: string; issuer?: string; year?: string; url?: string }[];
+}
+
+export interface OpenSourceBlock {
+  id: string;
+  type: 'openSource';
+  title: string;
+  items: { name: string; description?: string; url?: string; stars?: string }[];
+}
+
+export interface InterestsBlock {
+  id: string;
+  type: 'interests';
+  title: string;
+  items: string[];
+}
+
 export type CustomBlock =
   | CustomTextBlock
   | LanguageBlock
   | AwardBlock
   | LinksBlock
   | ExperienceBlock
-  | PublicationsBlock;
+  | PublicationsBlock
+  | ToolsBlock
+  | SoftSkillsBlock
+  | CoursesBlock
+  | OpenSourceBlock
+  | InterestsBlock;
 
 export interface Template {
   templateId: string;

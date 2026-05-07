@@ -23,18 +23,23 @@ import {
 
 type CompileStatus = 'idle' | 'compiling' | 'success' | 'error';
 
-interface TopBarProps {
-  cvId: string;
-  cvTitle: string;
-  editorMode: EditorMode;
-  onEditorModeChange: (mode: EditorMode) => void;
-  showLatexPanel: boolean;
-  onToggleLatexPanel: () => void;
-  onBack?: () => void;
+interface StatusBadgeProps {
+  compileStatus: CompileStatus;
+  isDirty: boolean;
+  isAutoCompiling?: boolean;
+  isAutoCompileWaiting?: boolean;
 }
 
-function StatusBadge({ compileStatus, isDirty }: { compileStatus: CompileStatus; isDirty: boolean }) {
-  if (compileStatus === 'compiling') {
+function StatusBadge({ compileStatus, isDirty, isAutoCompiling, isAutoCompileWaiting }: StatusBadgeProps) {
+  if (isAutoCompileWaiting) {
+    return (
+      <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 border border-blue-500/20 text-xs">
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 animate-pulse" />
+        <span className="text-blue-400">Auto compile in 2.5s…</span>
+      </span>
+    );
+  }
+  if (isAutoCompiling || compileStatus === 'compiling') {
     return (
       <span className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-xs">
         <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
@@ -74,6 +79,16 @@ function StatusBadge({ compileStatus, isDirty }: { compileStatus: CompileStatus;
   );
 }
 
+interface TopBarProps {
+  cvId: string;
+  cvTitle: string;
+  editorMode: EditorMode;
+  onEditorModeChange: (mode: EditorMode) => void;
+  showLatexPanel: boolean;
+  onToggleLatexPanel: () => void;
+  onBack?: () => void;
+}
+
 export function TopBar({
   cvId,
   cvTitle,
@@ -90,6 +105,9 @@ export function TopBar({
     latexSource,
     toggleAiDrawer,
     isDirty,
+    autoCompileEnabled,
+    toggleAutoCompile,
+    isAutoCompileWaiting,
   } = useEditorStore();
 
   const [showShortcuts, setShowShortcuts] = useState(false);
@@ -136,7 +154,12 @@ export function TopBar({
         {/* CV Title */}
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-medium text-sm text-zinc-100 truncate max-w-[12rem]">{cvTitle}</span>
-          <StatusBadge compileStatus={compileStatus} isDirty={isDirty} />
+          <StatusBadge
+            compileStatus={compileStatus}
+            isDirty={isDirty}
+            isAutoCompiling={isAutoCompileWaiting && compileStatus === 'compiling'}
+            isAutoCompileWaiting={isAutoCompileWaiting && compileStatus !== 'compiling'}
+          />
         </div>
 
         <div className="w-px h-5 bg-zinc-700 shrink-0" />
@@ -149,6 +172,21 @@ export function TopBar({
         >
           <Play size={11} />
           <span className="hidden sm:inline">{compileStatus === 'compiling' ? 'Compiling…' : 'Compile'}</span>
+        </button>
+
+        {/* Auto Compile toggle */}
+        <button
+          onClick={toggleAutoCompile}
+          className={cn(
+            'flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-medium transition-colors border',
+            autoCompileEnabled
+              ? 'bg-blue-600/10 border-blue-500/30 text-blue-400 hover:bg-blue-600/20'
+              : 'bg-zinc-800 border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700'
+          )}
+          title="Auto Compile (compiles automatically after edits)"
+        >
+          <RefreshCw size={11} className={autoCompileEnabled ? 'animate-spin' : ''} style={{ animationDuration: autoCompileEnabled ? '1s' : '0ms', animationPlayState: 'paused' }} />
+          <span className="hidden sm:inline">Auto</span>
         </button>
 
         <button

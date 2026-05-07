@@ -229,7 +229,7 @@ export function normalizeBlockLayout(resume: Resume): Resume {
   }
 
   // Deduplicate layout blocks and custom blocks
-  let result = deduplicateAllBlocks({ ...resume, resumeLayout: layout });
+  const result = deduplicateAllBlocks({ ...resume, resumeLayout: layout });
 
   return { ...result, resumeLayout: result.resumeLayout || layout };
 }
@@ -372,28 +372,37 @@ export function removeCustomBlock(resume: Resume, customBlockId: string): Resume
 
 export function addCustomBlock(resume: Resume, type: CustomBlockType, title?: string): Resume {
   const id = uuid();
-  let newBlock: CustomBlock;
 
-  switch (type) {
-    case 'customText':
-      newBlock = { id, type: 'customText', title: title || 'Custom Section', paragraphs: [''] };
-      break;
-    case 'languages':
-      newBlock = { id, type: 'languages', title: title || 'Languages', items: [{ language: '', proficiency: '' }] };
-      break;
-    case 'awards':
-      newBlock = { id, type: 'awards', title: title || 'Awards', items: [{ title: '', issuer: '', year: '' }] };
-      break;
-    case 'links':
-      newBlock = { id, type: 'links', title: title || 'Links', items: [{ label: '', url: '' }] };
-      break;
-    case 'experience':
-      newBlock = { id, type: 'experience', title: title || 'Experience', items: [{ role: '', company: '', period: '', description: '' }] };
-      break;
-    case 'publications':
-      newBlock = { id, type: 'publications', title: title || 'Publications', items: [{ title: '', venue: '', year: '' }] };
-      break;
-  }
+  const newBlock: CustomBlock | undefined = (() => {
+    switch (type) {
+      case 'customText':
+        return { id, type: 'customText', title: title || 'Custom Section', paragraphs: [''] };
+      case 'languages':
+        return { id, type: 'languages', title: title || 'Languages', items: [{ language: '', proficiency: '' }] };
+      case 'awards':
+        return { id, type: 'awards', title: title || 'Awards', items: [{ title: '', issuer: '', year: '' }] };
+      case 'links':
+        return { id, type: 'links', title: title || 'Links', items: [{ label: '', url: '' }] };
+      case 'experience':
+        return { id, type: 'experience', title: title || 'Experience', items: [{ role: '', company: '', period: '', description: '' }] };
+      case 'publications':
+        return { id, type: 'publications', title: title || 'Publications', items: [{ title: '', venue: '', year: '' }] };
+      case 'tools':
+        return { id, type: 'tools', title: title || 'Tools', items: [] };
+      case 'softSkills':
+        return { id, type: 'softSkills', title: title || 'Soft Skills', items: [] };
+      case 'courses':
+        return { id, type: 'courses', title: title || 'Courses', items: [] };
+      case 'openSource':
+        return { id, type: 'openSource', title: title || 'Open Source', items: [] };
+      case 'interests':
+        return { id, type: 'interests', title: title || 'Interests', items: [] };
+      default:
+        return undefined;
+    }
+  })();
+
+  if (!newBlock) return resume;
 
   return {
     ...resume,

@@ -83,11 +83,12 @@ const NAV_SECTIONS = [
   { id: 'export', label: 'Export' },
 ] as const;
 
-export function ResumeBlockSidebar() {
+export function ResumeBlockSidebar({ onBlockSelect, compact = false }: { onBlockSelect?: (blockId: string, blockType: BlockType | 'custom') => void; compact?: boolean }) {
   const toast = useToast();
   const {
     activeSection,
     setActiveSection,
+    setActiveLeftTab,
     generateFromBlocks,
     resumeData,
     updateResumeData,
@@ -98,6 +99,18 @@ export function ResumeBlockSidebar() {
   const customBlocks: CustomBlock[] = resumeData.customBlocks || [];
 
   const [deleteTarget, setDeleteTarget] = useState<{ type: 'core' | 'custom'; id: string; label: string } | null>(null);
+
+  const handleBlockClick = (blockId: string, blockType: BlockType | 'custom') => {
+    if (onBlockSelect) {
+      onBlockSelect(blockId, blockType);
+    } else {
+      if (blockType === 'custom') {
+        setActiveSection(`custom-${blockId}` as typeof activeSection);
+      } else {
+        setActiveSection(`block-${blockId}` as typeof activeSection);
+      }
+    }
+  };
 
   // --- Core block actions ---
   const handleMoveCoreBlock = (blockId: string, direction: BlockDirection) => {
@@ -162,7 +175,7 @@ export function ResumeBlockSidebar() {
               label={label}
               isActive={isActive}
               isInactive={false}
-              onClick={() => setActiveSection(`block-${block.id}` as typeof activeSection)}
+              onClick={() => handleBlockClick(block.id, block.type)}
               onMoveUp={() => handleMoveCoreBlock(block.id, 'up')}
               onMoveDown={() => handleMoveCoreBlock(block.id, 'down')}
               onToggle={() => handleToggleCoreBlock(block.id)}
@@ -189,7 +202,7 @@ export function ResumeBlockSidebar() {
                   label={label}
                   isActive={false}
                   isInactive={true}
-                  onClick={() => setActiveSection(`block-${block.id}` as typeof activeSection)}
+                  onClick={() => handleBlockClick(block.id, block.type)}
                   onMoveUp={() => handleMoveCoreBlock(block.id, 'up')}
                   onMoveDown={() => handleMoveCoreBlock(block.id, 'down')}
                   onToggle={() => handleToggleCoreBlock(block.id)}
@@ -212,7 +225,7 @@ export function ResumeBlockSidebar() {
               label={block.title}
               isActive={isActive}
               isInactive={false}
-              onClick={() => setActiveSection(`custom-${block.id}` as typeof activeSection)}
+              onClick={() => handleBlockClick(block.id, 'custom')}
               onMoveUp={undefined}
               onMoveDown={undefined}
               onToggle={undefined}
@@ -229,7 +242,10 @@ export function ResumeBlockSidebar() {
             return (
               <button
                 key={section.id}
-                onClick={() => setActiveSection(section.id as typeof activeSection)}
+                onClick={() => {
+                  setActiveSection(section.id as typeof activeSection);
+                  if (onBlockSelect) { setActiveLeftTab('layout'); }
+                }}
                 className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-all duration-100 ${
                   isActive
                     ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'

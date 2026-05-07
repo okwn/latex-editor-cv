@@ -29,8 +29,11 @@ section('Loading default resume LaTeX');
 let latex;
 try {
   const { defaultResume } = await import('../src/lib/resume/defaultResume.ts');
+  const { normalizeBlockLayout } = await import('../src/lib/resume/blockLayout.ts');
   const { renderWithTemplate } = await import('../src/lib/resume/editorStore.ts');
-  latex = renderWithTemplate(defaultResume, 'kcv-modern');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const normalized = normalizeBlockLayout(defaultResume);
+  latex = renderWithTemplate(normalized, 'kcv-modern');
   log('LaTeX generated', 'PASS', `length=${latex.length}`);
 } catch (e) {
   log('LaTeX generation', 'FAIL', e.message);

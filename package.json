@@ -11,7 +11,8 @@
     "check:templates": "npx tsx scripts/validate-templates.mjs",
     "check:latex:static": "npx tsx scripts/validate-generated-latex.mjs",
     "check:latex": "npx tsx scripts/validate-latex-compile.mjs",
-    "check:local": "node scripts/check-local-env.mjs"
+    "check:local": "node scripts/check-local-env.mjs",
+    "check:custom-blocks": "npx tsx scripts/validate-custom-blocks.mjs"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",

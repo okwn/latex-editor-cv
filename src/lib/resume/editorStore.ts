@@ -73,6 +73,9 @@ interface EditorState {
   lastPdfUrl: string | null;
   // Auto compile
   autoCompileEnabled: boolean;
+  isAutoCompileWaiting: boolean;
+  // Left panel tab state: navigate=list, layout=edit, add=block store
+  activeLeftTab: 'navigate' | 'layout' | 'add';
   // Actions
   setResumeData: (resume: Resume) => void;
   updateResumeData: (updater: (prev: Resume) => Resume) => void;
@@ -101,6 +104,8 @@ interface EditorState {
   toggleShowLatexPanel: () => void;
   setAutoCompileEnabled: (enabled: boolean) => void;
   toggleAutoCompile: () => void;
+  setIsAutoCompileWaiting: (waiting: boolean) => void;
+  setActiveLeftTab: (tab: 'navigate' | 'layout' | 'add') => void;
   bootstrap: () => void;
 }
 
@@ -153,6 +158,7 @@ export function renderWithTemplate(resume: Resume, templateId: string | null | u
 
 // Bootstrap token — set to true after first render to avoid infinite loop
 let bootstrapDone = false;
+const bootstrapDoneRef = { current: false };
 
 /**
  * Initial template ID — always a valid string.
@@ -195,6 +201,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   currentTemplateId: initialTemplateId,
   lastPdfUrl: getLastPdfUrl(),
   autoCompileEnabled: false,
+  isAutoCompileWaiting: false,
+  activeLeftTab: 'navigate',
 
   setResumeData: (resume) => set({ resumeData: resume }),
 
@@ -377,4 +385,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setAutoCompileEnabled: (enabled) => set({ autoCompileEnabled: enabled }),
 
   toggleAutoCompile: () => set((state) => ({ autoCompileEnabled: !state.autoCompileEnabled })),
+
+  setIsAutoCompileWaiting: (waiting) => set({ isAutoCompileWaiting: waiting }),
+
+  setActiveLeftTab: (tab) => set({ activeLeftTab: tab }),
 }));

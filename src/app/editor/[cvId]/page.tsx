@@ -182,6 +182,13 @@ export default function EditorPage() {
     return () => clearTimeout(timer);
   }, [cvId, resumeData, latexSource, loading]);
 
+  // Signal AutoCompileManager that bootstrap is complete (no auto-compile on initial load)
+  useEffect(() => {
+    if (!loading) {
+      window.dispatchEvent(new Event('kcv:bootstrap-complete'));
+    }
+  }, [loading]);
+
   useEffect(() => {
     if (!cvId || loading || !pdfUrl || !compileId) return;
     touchCvDocumentCompile(cvId, pdfUrl);
