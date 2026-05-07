@@ -143,10 +143,11 @@ function BlockStoreCard({ type, isAdded, isInactive, onAdd, onActivate }: BlockS
 
 interface CustomBlockStoreCardProps {
   type: CustomBlockType;
+  isAdded: boolean;
   onAdd: () => void;
 }
 
-function CustomBlockStoreCard({ type, onAdd }: CustomBlockStoreCardProps) {
+function CustomBlockStoreCard({ type, isAdded, onAdd }: CustomBlockStoreCardProps) {
   const def = BLOCK_DEFINITIONS[type];
   const rawIcon = ICON_MAP[def.icon];
   const Icon = rawIcon as (props: { size: number; className?: string }) => React.ReactElement;
@@ -170,12 +171,16 @@ function CustomBlockStoreCard({ type, onAdd }: CustomBlockStoreCardProps) {
       <div className="mt-2 flex justify-end">
         {!def.supported ? (
           <span className="text-[10px] text-zinc-600 italic">Not yet available</span>
+        ) : isAdded && BLOCK_DEFINITIONS[type].unique ? (
+          <span className="flex items-center gap-1 px-2 py-1 text-[10px] text-zinc-500">
+            <Check size={10} /> Added
+          </span>
         ) : (
           <button
             onClick={onAdd}
             className="flex items-center gap-1 px-2 py-1 rounded text-[10px] bg-blue-600 hover:bg-blue-500 text-white transition-colors"
           >
-            <Plus size={10} /> Add
+            <Plus size={10} /> {isAdded ? 'Add Another' : 'Add'}
           </button>
         )}
       </div>
@@ -261,13 +266,17 @@ export function BlockStorePanel({ onClose }: BlockStorePanelProps) {
         <div>
           <div className="text-[10px] font-semibold text-zinc-500 uppercase tracking-wider mb-2 px-1">Custom Blocks</div>
           <div className="space-y-1.5">
-            {BLOCK_TYPE_GROUPS[1].types.map((type) => (
-              <CustomBlockStoreCard
-                key={type}
-                type={type as CustomBlockType}
-                onAdd={() => handleAddCustomBlock(type as CustomBlockType)}
-              />
-            ))}
+            {BLOCK_TYPE_GROUPS[1].types.map((type) => {
+              const isAdded = !!(resumeData.customBlocks || []).find((b) => b.type === type);
+              return (
+                <CustomBlockStoreCard
+                  key={type}
+                  type={type as CustomBlockType}
+                  isAdded={isAdded}
+                  onAdd={() => handleAddCustomBlock(type as CustomBlockType)}
+                />
+              );
+            })}
           </div>
         </div>
       </div>
