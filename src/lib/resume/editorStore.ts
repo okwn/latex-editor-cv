@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { Resume } from '@/types/resume';
 import { defaultResume } from '@/lib/resume/defaultResume';
+import { normalizeBlockLayout } from '@/lib/resume/blockLayout';
 import { TEMPLATES, getTemplate, DEFAULT_TEMPLATE_ID } from '@/lib/templates/templateRegistry';
 // Import kcvModernTemplate to trigger its registerTemplate() side-effect
 import '@/lib/templates/kcvModernTemplate';
@@ -12,6 +13,8 @@ import {
   getPersistedTemplateId,
   setPersistedTemplateId,
 } from '@/lib/resume/persistence';
+
+export type EditorMode = 'blocks' | 'latex';
 
 export type CompileStatus = 'idle' | 'compiling' | 'success' | 'error';
 
@@ -40,16 +43,28 @@ interface EditorState {
   resumeData: Resume;
   // LaTeX source
   latexSource: string;
+  // Editor mode: "blocks" = regenerate LaTeX from blocks before compile; "latex" = use latexSource directly
+  editorMode: EditorMode;
+  // Dirty tracking
+  isDirty: boolean;
+  dirtyReason: string | null;
   // Compile state
   compileStatus: CompileStatus;
   compileErrors: CompileError[];
+  // Hash tracking for cache busting
+  lastGeneratedLatexHash: string | null;
+  lastCompiledLatexHash: string | null;
+  lastCompiledAt: number | null;
+  // PDF state
+  pdfUrl: string | null;
+  pdfVersion: number;
   // Selection
   selectedBlockId: string | null;
   activeSection: ActiveSection;
   // UI
   aiDrawerOpen: boolean;
-  pdfUrl: string | null;
   rawLatexMode: boolean;
+  showLatexPanel: boolean;
   aiContext: string | null;
   compileId: string | null;
   synctexAvailable: boolean;
@@ -58,6 +73,7 @@ interface EditorState {
   lastPdfUrl: string | null;
   // Actions
   setResumeData: (resume: Resume) => void;
+  updateResumeData: (updater: (prev: Resume) => Resume) => void;
   setLatexSource: (source: string) => void;
   setSelectedBlockId: (id: string | null) => void;
   setActiveSection: (section: ActiveSection) => void;
@@ -68,12 +84,19 @@ interface EditorState {
   setAutoCompileAfterAi: (enabled: boolean) => void;
   setCurrentTemplateId: (id: string) => void;
   generateFromBlocks: () => void;
+  regenerateLatexFromBlocks: () => void;
   resetToTemplate: () => void;
   compile: () => Promise<void>;
+  compileCurrent: () => Promise<void>;
   exportPdf: () => Promise<void>;
   jumpToLine: (line: number) => void;
+  navigateToBlock: (blockId: string) => void;
   askAiToFix: (error: CompileError) => void;
   clearAiContext: () => void;
+  setEditorMode: (mode: EditorMode) => void;
+  markDirty: (reason: string) => void;
+  setShowLatexPanel: (show: boolean) => void;
+  toggleShowLatexPanel: () => void;
   bootstrap: () => void;
 }
 
@@ -137,16 +160,30 @@ const initialTemplateId: string = (() => {
   return ensureValidTemplateId(persisted ?? fromDefault ?? null);
 })();
 
+const isDev = process.env.NODE_ENV === 'development';
+
+function devLog(...args: unknown[]) {
+  if (isDev) console.debug('[editorStore]', ...args);
+}
+
 export const useEditorStore = create<EditorState>((set, get) => ({
-  resumeData: defaultResume,
+  resumeData: normalizeBlockLayout(defaultResume as Resume),
   latexSource: '',
+  editorMode: 'blocks',
+  isDirty: false,
+  dirtyReason: null,
   compileStatus: 'idle',
   compileErrors: [],
+  lastGeneratedLatexHash: null,
+  lastCompiledLatexHash: null,
+  lastCompiledAt: null,
+  pdfUrl: null,
+  pdfVersion: 0,
   selectedBlockId: null,
   activeSection: 'personal',
   aiDrawerOpen: false,
-  pdfUrl: null,
   rawLatexMode: false,
+  showLatexPanel: false,
   aiContext: null,
   compileId: null,
   synctexAvailable: false,
@@ -155,60 +192,139 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   lastPdfUrl: getLastPdfUrl(),
 
   setResumeData: (resume) => set({ resumeData: resume }),
+
+  updateResumeData: (updater) => {
+    const next = updater(get().resumeData);
+    set({ resumeData: next, isDirty: true, dirtyReason: 'blocks edited' });
+    devLog('markDirty: blocks edited', 'fullName=', next.personal?.fullName);
+  },
+
   setLatexSource: (source) => set({ latexSource: source }),
+
   setSelectedBlockId: (id) => set({ selectedBlockId: id }),
   setActiveSection: (section) => set({ activeSection: section }),
   setCompileStatus: (status) => set({ compileStatus: status }),
   setCompileErrors: (errors) => set({ compileErrors: errors }),
+
   toggleAiDrawer: () => set((state) => ({ aiDrawerOpen: !state.aiDrawerOpen })),
   toggleRawLatexMode: () => set((state) => ({ rawLatexMode: !state.rawLatexMode })),
+
   setAutoCompileAfterAi: (enabled) => set({ autoCompileAfterAi: enabled }),
+
   setCurrentTemplateId: (id) => {
     const validId = ensureValidTemplateId(id);
     const latex = renderWithTemplate(get().resumeData, validId);
+    const hash = checksumLatex(latex);
     setPersistedTemplateId(validId);
-    set({ currentTemplateId: validId, latexSource: latex, compileStatus: 'idle', compileErrors: [] });
+    set({
+      currentTemplateId: validId,
+      latexSource: latex,
+      lastGeneratedLatexHash: hash,
+      compileStatus: 'idle',
+      compileErrors: [],
+    });
   },
+
   bootstrap: () => {
     if (bootstrapDone) return;
     bootstrapDone = true;
     const latex = renderWithTemplate(get().resumeData, get().currentTemplateId);
-    set({ latexSource: latex });
+    const hash = checksumLatex(latex);
+    devLog('bootstrap: resumeData.fullName=', get().resumeData.personal?.fullName);
+    devLog('bootstrap: latexHash=', hash);
+    set({ latexSource: latex, lastGeneratedLatexHash: hash });
   },
 
   jumpToLine: (line: number) => {
     set({ selectedBlockId: `error-line-${line}` });
   },
 
+  navigateToBlock: (blockId: string) => {
+    set({ selectedBlockId: blockId });
+  },
+
   generateFromBlocks: () => {
     const { resumeData, currentTemplateId } = get();
     const latex = renderWithTemplate(resumeData, currentTemplateId);
-    set({ latexSource: latex, compileStatus: 'idle', compileErrors: [] });
+    const hash = checksumLatex(latex);
+    devLog('generateFromBlocks: latexHash=', hash, 'fullName=', resumeData.personal?.fullName);
+    set({ latexSource: latex, lastGeneratedLatexHash: hash, compileStatus: 'idle', compileErrors: [] });
+  },
+
+  regenerateLatexFromBlocks: () => {
+    const { resumeData, currentTemplateId } = get();
+    const latex = renderWithTemplate(resumeData, currentTemplateId);
+    const hash = checksumLatex(latex);
+    devLog('regenerateLatexFromBlocks: latexHash=', hash, 'fullName=', resumeData.personal?.fullName);
+    set({
+      latexSource: latex,
+      lastGeneratedLatexHash: hash,
+      isDirty: false,
+      dirtyReason: null,
+      compileStatus: 'idle',
+      compileErrors: [],
+    });
   },
 
   resetToTemplate: () => {
     const { resumeData, currentTemplateId } = get();
     const latex = renderWithTemplate(resumeData, currentTemplateId);
-    set({ latexSource: latex, compileStatus: 'idle', compileErrors: [] });
+    const hash = checksumLatex(latex);
+    set({ latexSource: latex, lastGeneratedLatexHash: hash, compileStatus: 'idle', compileErrors: [] });
   },
 
   compile: async () => {
+    const { editorMode, resumeData, currentTemplateId } = get();
+
+    // In blocks mode: regenerate LaTeX from resumeData first
+    if (editorMode === 'blocks') {
+      devLog('compile: blocks mode — regenerating LaTeX first', 'fullName=', resumeData.personal?.fullName);
+      const latex = renderWithTemplate(resumeData, currentTemplateId);
+      const hash = checksumLatex(latex);
+      devLog('compile: blocks mode latexHash=', hash);
+      set({
+        latexSource: latex,
+        lastGeneratedLatexHash: hash,
+        isDirty: false,
+        dirtyReason: null,
+      });
+    } else {
+      devLog('compile: latex mode — using latexSource directly', 'latexHash=', get().lastGeneratedLatexHash);
+    }
+
+    await get().compileCurrent();
+  },
+
+  compileCurrent: async () => {
+    const { latexSource } = get();
+    const hashBefore = checksumLatex(latexSource);
+    devLog('compileCurrent: latexHash before compile=', hashBefore);
+
     set({ compileStatus: 'compiling', compileErrors: [] });
+
     try {
       const response = await fetch('/api/compile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ latexSource: get().latexSource }),
+        body: JSON.stringify({ latexSource }),
       });
       const result = await response.json();
+
       if (result.ok) {
-        const hash = checksumLatex(get().latexSource);
-        setLastCompiledHash(hash);
+        const newVersion = get().pdfVersion + 1;
+        const pdfUrlWithVersion = `${result.pdfUrl}?v=${newVersion}`;
+        devLog('compileCurrent: pdfUrl after compile=', pdfUrlWithVersion);
+
+        setLastCompiledHash(hashBefore);
         setLastPdfUrl(result.pdfUrl);
+
         set({
           compileStatus: 'success',
-          pdfUrl: result.pdfUrl,
+          pdfUrl: pdfUrlWithVersion,
+          pdfVersion: newVersion,
           lastPdfUrl: result.pdfUrl,
+          lastCompiledLatexHash: hashBefore,
+          lastCompiledAt: Date.now(),
           compileId: result.compileId || null,
           synctexAvailable: result.synctexAvailable || false,
         });
@@ -241,4 +357,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   clearAiContext: () => set({ aiContext: null }),
+
+  setEditorMode: (mode) => set({ editorMode: mode }),
+
+  markDirty: (reason) => {
+    devLog('markDirty:', reason);
+    set({ isDirty: true, dirtyReason: reason });
+  },
+
+  setShowLatexPanel: (show) => set({ showLatexPanel: show }),
+
+  toggleShowLatexPanel: () => set((state) => ({ showLatexPanel: !state.showLatexPanel })),
 }));

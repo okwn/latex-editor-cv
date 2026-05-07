@@ -1,10 +1,12 @@
 'use client';
 
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import Editor, { OnMount, OnChange, loader } from '@monaco-editor/react';
 import type * as Monaco from 'monaco-editor';
 import { useEditorStore, CompileError } from '@/lib/resume/editorStore';
 import { CompileErrorsPanel } from './CompileErrorsPanel';
+import { useToast } from '@/components/ui/Toast';
+import { AlertTriangle } from 'lucide-react';
 
 loader.init().then((monaco) => {
   const langs = monaco.languages.getLanguages();
@@ -96,19 +98,19 @@ function flashLineDecoration(
 }
 
 export function LatexEditor({ onCursorChange }: LatexEditorProps) {
+  const toast = useToast();
   const {
     latexSource,
     compileErrors,
-    rawLatexMode,
+    editorMode,
     setLatexSource,
-    generateFromBlocks,
-    resetToTemplate,
-    toggleRawLatexMode,
+    regenerateLatexFromBlocks,
   } = useEditorStore();
+
+  const [showRegenConfirm, setShowRegenConfirm] = useState(false);
 
   const editorRef = useRef<Monaco.editor.IStandaloneCodeEditor | null>(null);
   const monacoRef = useRef<typeof Monaco | null>(null);
-  const highlightTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleChange: OnChange = useCallback(
     (value) => {
@@ -131,7 +133,6 @@ export function LatexEditor({ onCursorChange }: LatexEditorProps) {
       editorRef.current = editor;
       monacoRef.current = monaco;
 
-      // Define flash highlight style
       monaco.editor.defineTheme('latex-flash', {
         base: 'vs-dark',
         inherit: false,
@@ -142,14 +143,12 @@ export function LatexEditor({ onCursorChange }: LatexEditorProps) {
         },
       });
 
-      // Wire cursor position tracking
       editor.onDidChangeCursorPosition((e) => {
         if (onCursorChange) {
           onCursorChange(e.position.lineNumber, e.position.column);
         }
       });
 
-      // Apply initial diagnostics
       if (compileErrors.length > 0) {
         applyDiagnostics(monaco, compileErrors, editor.getModel());
       }
@@ -157,7 +156,6 @@ export function LatexEditor({ onCursorChange }: LatexEditorProps) {
     [compileErrors, onCursorChange]
   );
 
-  // Apply diagnostics when errors change (after mount)
   useEffect(() => {
     if (monacoRef.current && editorRef.current) {
       const model = editorRef.current.getModel();
@@ -169,25 +167,29 @@ export function LatexEditor({ onCursorChange }: LatexEditorProps) {
     }
   }, [compileErrors]);
 
+  const handleRegenerate = () => {
+    if (editorMode === 'latex' && latexSource) {
+      // In latex mode, warn that this will overwrite raw edits
+      setShowRegenConfirm(true);
+    } else {
+      regenerateLatexFromBlocks();
+    }
+  };
+
+  const confirmRegenerate = () => {
+    regenerateLatexFromBlocks();
+    setShowRegenConfirm(false);
+    toast({ message: 'LaTeX regenerated from blocks', type: 'info', duration: 2000 });
+  };
+
   return (
     <div className="flex flex-col h-full">
-      {/* Minimal toolbar — main actions are in the top bar */}
+      {/* Minimal toolbar */}
       <div className="flex items-center gap-1 px-3 py-1.5 border-b border-zinc-800/50 bg-zinc-900/30 text-xs">
         <button
-          onClick={resetToTemplate}
+          onClick={handleRegenerate}
           className="flex items-center gap-1.5 px-2 py-1 rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-          title="Reset to template"
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="1 4 1 10 7 10" />
-            <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
-          </svg>
-          <span className="hidden sm:inline">Reset</span>
-        </button>
-        <button
-          onClick={generateFromBlocks}
-          className="flex items-center gap-1.5 px-2 py-1 rounded text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-          title="Regenerate from blocks"
+          title="Regenerate LaTeX from blocks"
         >
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <rect x="3" y="3" width="7" height="7" />
@@ -195,26 +197,35 @@ export function LatexEditor({ onCursorChange }: LatexEditorProps) {
             <rect x="14" y="14" width="7" height="7" />
             <rect x="3" y="14" width="7" height="7" />
           </svg>
-          <span className="hidden sm:inline">Regenerate</span>
+          <span className="hidden sm:inline">Regenerate from Blocks</span>
         </button>
         <div className="flex-1" />
-        <button
-          onClick={toggleRawLatexMode}
-          className={`flex items-center gap-1.5 px-2 py-1 rounded transition-colors ${
-            rawLatexMode
-              ? 'bg-purple-600/20 text-purple-400'
-              : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'
-          }`}
-          title="Toggle raw LaTeX mode"
-        >
-          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <polyline points="4 7 4 4 20 4 20 7" />
-            <line x1="9" y1="20" x2="15" y2="20" />
-            <line x1="12" y1="4" x2="12" y2="20" />
-          </svg>
-          <span className="hidden sm:inline">{rawLatexMode ? 'Raw LaTeX' : 'Blocks'}</span>
-        </button>
+        <span className="text-xs text-zinc-600">
+          {editorMode === 'latex' ? 'LaTeX mode' : 'Blocks mode'}
+        </span>
       </div>
+
+      {/* Regeneration confirmation */}
+      {showRegenConfirm && (
+        <div className="flex items-center gap-2 px-3 py-2 bg-amber-900/20 border-b border-amber-800/30 text-xs">
+          <AlertTriangle size={12} className="text-amber-400 shrink-0" />
+          <span className="text-amber-300 flex-1">
+            This will overwrite your raw LaTeX edits with blocks-generated code.
+          </span>
+          <button
+            onClick={() => setShowRegenConfirm(false)}
+            className="px-2 py-0.5 rounded text-zinc-400 hover:text-zinc-200 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={confirmRegenerate}
+            className="px-2 py-0.5 rounded bg-amber-600/30 text-amber-400 hover:bg-amber-600/50 transition-colors"
+          >
+            Overwrite
+          </button>
+        </div>
+      )}
 
       {/* Editor */}
       <div className="flex-1 overflow-hidden">

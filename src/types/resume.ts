@@ -1,3 +1,5 @@
+import type { ResumeLayout } from './blockLayout';
+
 export interface Personal {
   fullName: string;
   role: string;
@@ -48,6 +50,58 @@ export interface Certifications {
   certifications: string[];
 }
 
+export type CustomBlockType = 'customText' | 'languages' | 'awards' | 'links' | 'experience' | 'publications';
+
+export interface CustomTextBlock {
+  id: string;
+  type: 'customText';
+  title: string;
+  paragraphs: string[];
+}
+
+export interface LanguageBlock {
+  id: string;
+  type: 'languages';
+  title: string;
+  items: { language: string; proficiency?: string }[];
+}
+
+export interface AwardBlock {
+  id: string;
+  type: 'awards';
+  title: string;
+  items: { title: string; issuer?: string; year?: string }[];
+}
+
+export interface LinksBlock {
+  id: string;
+  type: 'links';
+  title: string;
+  items: { label: string; url: string }[];
+}
+
+export interface ExperienceBlock {
+  id: string;
+  type: 'experience';
+  title: string;
+  items: { role: string; company: string; period: string; description: string }[];
+}
+
+export interface PublicationsBlock {
+  id: string;
+  type: 'publications';
+  title: string;
+  items: { title: string; venue: string; year: string; url?: string }[];
+}
+
+export type CustomBlock =
+  | CustomTextBlock
+  | LanguageBlock
+  | AwardBlock
+  | LinksBlock
+  | ExperienceBlock
+  | PublicationsBlock;
+
 export interface Template {
   templateId: string;
   templateName: string;
@@ -62,4 +116,6 @@ export interface Resume {
   focusAreas: string[];
   certifications: string[];
   template: Template;
+  resumeLayout?: ResumeLayout;
+  customBlocks: CustomBlock[];
 }

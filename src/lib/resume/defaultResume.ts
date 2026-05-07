@@ -129,4 +129,5 @@ export const defaultResume: Resume = {
     templateId: 'kcv-modern',
     templateName: 'KCV Modern LaTeX',
   },
+  customBlocks: [],
 };

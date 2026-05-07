@@ -3,14 +3,14 @@
 import { useEditorStore } from '@/lib/resume/editorStore';
 
 export function HeaderBlockEditor() {
-  const { resumeData, setResumeData } = useEditorStore();
-  const { personal } = resumeData;
+  const { updateResumeData } = useEditorStore();
+  const personal = useEditorStore((s) => s.resumeData.personal ?? {});
 
-  const update = <K extends keyof typeof personal>(field: K, value: typeof personal[K]) => {
-    setResumeData({
-      ...resumeData,
-      personal: { ...personal, [field]: value },
-    });
+  const update = <K extends keyof NonNullable<typeof personal>>(field: K, value: NonNullable<typeof personal>[K]) => {
+    updateResumeData((prev) => ({
+      ...prev,
+      personal: { ...(prev.personal ?? {}), [field]: value },
+    }));
   };
 
   return (

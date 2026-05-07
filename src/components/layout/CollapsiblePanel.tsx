@@ -5,12 +5,12 @@ import { cn } from '@/lib/utils';
 
 export function CollapsiblePanel({
   children,
-  collapsed,
+  collapsed = false,
   width = '18rem',
   className,
 }: {
   children: ReactNode;
-  collapsed: boolean;
+  collapsed?: boolean;
   width?: string;
   className?: string;
 }) {

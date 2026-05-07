@@ -4,20 +4,28 @@ import { useEditorStore } from '@/lib/resume/editorStore';
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 
 export function CertificationsBlockEditor() {
-  const { resumeData, setResumeData } = useEditorStore();
-  const { certifications } = resumeData;
+  const { updateResumeData } = useEditorStore();
+  const certifications = useEditorStore((s) => s.resumeData.certifications ?? []);
 
   const update = (index: number, value: string) => {
-    const updated = certifications.map((item, i) => (i === index ? value : item));
-    setResumeData({ ...resumeData, certifications: updated });
+    updateResumeData((prev) => ({
+      ...prev,
+      certifications: (prev.certifications ?? []).map((item, i) => (i === index ? value : item)),
+    }));
   };
 
   const add = () => {
-    setResumeData({ ...resumeData, certifications: [...certifications, ''] });
+    updateResumeData((prev) => ({
+      ...prev,
+      certifications: [...(prev.certifications ?? []), ''],
+    }));
   };
 
   const remove = (index: number) => {
-    setResumeData({ ...resumeData, certifications: certifications.filter((_, i) => i !== index) });
+    updateResumeData((prev) => ({
+      ...prev,
+      certifications: (prev.certifications ?? []).filter((_, i) => i !== index),
+    }));
   };
 
   const move = (index: number, direction: 'up' | 'down') => {
@@ -26,10 +34,12 @@ export function CertificationsBlockEditor() {
       (direction === 'down' && index === certifications.length - 1)
     )
       return;
-    const updated = [...certifications];
-    const target = direction === 'up' ? index - 1 : index + 1;
-    [updated[index], updated[target]] = [updated[target], updated[index]];
-    setResumeData({ ...resumeData, certifications: updated });
+    updateResumeData((prev) => {
+      const arr = [...(prev.certifications ?? [])];
+      const target = direction === 'up' ? index - 1 : index + 1;
+      [arr[index], arr[target]] = [arr[target], arr[index]];
+      return { ...prev, certifications: arr };
+    });
   };
 
   return (

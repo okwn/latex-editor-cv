@@ -3,11 +3,14 @@
 import { useEditorStore } from '@/lib/resume/editorStore';
 
 export function SummaryBlockEditor() {
-  const { resumeData, setResumeData } = useEditorStore();
-  const { summary } = resumeData;
+  const { resumeData, updateResumeData } = useEditorStore();
+  const { professionalSummary } = resumeData.summary ?? {};
 
-  const update = (field: 'professionalSummary', value: string) => {
-    setResumeData({ ...resumeData, summary: { ...summary, [field]: value } });
+  const update = (value: string) => {
+    updateResumeData((prev) => ({
+      ...prev,
+      summary: { ...(prev.summary ?? {}), professionalSummary: value },
+    }));
   };
 
   return (
@@ -16,8 +19,8 @@ export function SummaryBlockEditor() {
         <label className="text-xs font-medium text-zinc-400">Professional Summary</label>
         <p className="text-xs text-zinc-500">A 2-3 sentence overview of your background and key strengths.</p>
         <textarea
-          value={summary.professionalSummary}
-          onChange={(e) => update('professionalSummary', e.target.value)}
+          value={professionalSummary ?? ''}
+          onChange={(e) => update(e.target.value)}
           rows={5}
           className="w-full bg-zinc-800 border border-zinc-700 rounded-md px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 resize-none leading-relaxed"
           placeholder="Fifteen years of experience across multiple technologies..."

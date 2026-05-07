@@ -5,21 +5,23 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { v4 as uuid } from 'uuid';
 
 export function ProjectsBlockEditor() {
-  const { resumeData, setResumeData } = useEditorStore();
-  const { projects } = resumeData;
+  const { updateResumeData } = useEditorStore();
+  const projects = useEditorStore((s) => s.resumeData.projects ?? []);
 
   const update = (index: number, field: string, value: string | string[] | undefined) => {
-    const updated = projects.map((p, i) =>
-      i === index ? { ...p, [field]: value } : p
-    );
-    setResumeData({ ...resumeData, projects: updated });
+    updateResumeData((prev) => ({
+      ...prev,
+      projects: (prev.projects ?? []).map((p, i) =>
+        i === index ? { ...p, [field]: value } : p
+      ),
+    }));
   };
 
   const add = () => {
-    setResumeData({
-      ...resumeData,
+    updateResumeData((prev) => ({
+      ...prev,
       projects: [
-        ...projects,
+        ...(prev.projects ?? []),
         {
           id: uuid(),
           title: '',
@@ -31,11 +33,14 @@ export function ProjectsBlockEditor() {
           priority: undefined,
         },
       ],
-    });
+    }));
   };
 
   const remove = (index: number) => {
-    setResumeData({ ...resumeData, projects: projects.filter((_, i) => i !== index) });
+    updateResumeData((prev) => ({
+      ...prev,
+      projects: (prev.projects ?? []).filter((_, i) => i !== index),
+    }));
   };
 
   const move = (index: number, direction: 'up' | 'down') => {
@@ -44,10 +49,12 @@ export function ProjectsBlockEditor() {
       (direction === 'down' && index === projects.length - 1)
     )
       return;
-    const updated = [...projects];
-    const target = direction === 'up' ? index - 1 : index + 1;
-    [updated[index], updated[target]] = [updated[target], updated[index]];
-    setResumeData({ ...resumeData, projects: updated });
+    updateResumeData((prev) => {
+      const arr = [...(prev.projects ?? [])];
+      const target = direction === 'up' ? index - 1 : index + 1;
+      [arr[index], arr[target]] = [arr[target], arr[index]];
+      return { ...prev, projects: arr };
+    });
   };
 
   return (

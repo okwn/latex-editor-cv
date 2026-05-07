@@ -5,21 +5,22 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { v4 as uuid } from 'uuid';
 
 export function EducationBlockEditor() {
-  const { resumeData, setResumeData } = useEditorStore();
-  const { education } = resumeData;
+  const { updateResumeData } = useEditorStore();
 
   const update = (index: number, field: string, value: string) => {
-    const updated = education.map((item, i) =>
-      i === index ? { ...item, [field]: value } : item
-    );
-    setResumeData({ ...resumeData, education: updated });
+    updateResumeData((prev) => ({
+      ...prev,
+      education: (prev.education ?? []).map((item, i) =>
+        i === index ? { ...item, [field]: value } : item
+      ),
+    }));
   };
 
   const add = () => {
-    setResumeData({
-      ...resumeData,
+    updateResumeData((prev) => ({
+      ...prev,
       education: [
-        ...education,
+        ...(prev.education ?? []),
         {
           id: uuid(),
           degree: '',
@@ -30,24 +31,32 @@ export function EducationBlockEditor() {
           status: undefined,
         },
       ],
-    });
+    }));
   };
 
   const remove = (index: number) => {
-    setResumeData({ ...resumeData, education: education.filter((_, i) => i !== index) });
+    updateResumeData((prev) => ({
+      ...prev,
+      education: (prev.education ?? []).filter((_, i) => i !== index),
+    }));
   };
 
   const move = (index: number, direction: 'up' | 'down') => {
+    const education = useEditorStore.getState().resumeData.education ?? [];
     if (
       (direction === 'up' && index === 0) ||
       (direction === 'down' && index === education.length - 1)
     )
       return;
-    const updated = [...education];
-    const target = direction === 'up' ? index - 1 : index + 1;
-    [updated[index], updated[target]] = [updated[target], updated[index]];
-    setResumeData({ ...resumeData, education: updated });
+    updateResumeData((prev) => {
+      const arr = [...(prev.education ?? [])];
+      const target = direction === 'up' ? index - 1 : index + 1;
+      [arr[index], arr[target]] = [arr[target], arr[index]];
+      return { ...prev, education: arr };
+    });
   };
+
+  const education = useEditorStore((s) => s.resumeData.education ?? []);
 
   return (
     <div className="space-y-4 px-1">

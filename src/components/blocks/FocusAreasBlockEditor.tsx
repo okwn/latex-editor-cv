@@ -4,20 +4,28 @@ import { useEditorStore } from '@/lib/resume/editorStore';
 import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 
 export function FocusAreasBlockEditor() {
-  const { resumeData, setResumeData } = useEditorStore();
-  const { focusAreas } = resumeData;
+  const { updateResumeData } = useEditorStore();
+  const focusAreas = useEditorStore((s) => s.resumeData.focusAreas ?? []);
 
   const update = (index: number, value: string) => {
-    const updated = focusAreas.map((item, i) => (i === index ? value : item));
-    setResumeData({ ...resumeData, focusAreas: updated });
+    updateResumeData((prev) => ({
+      ...prev,
+      focusAreas: (prev.focusAreas ?? []).map((item, i) => (i === index ? value : item)),
+    }));
   };
 
   const add = () => {
-    setResumeData({ ...resumeData, focusAreas: [...focusAreas, ''] });
+    updateResumeData((prev) => ({
+      ...prev,
+      focusAreas: [...(prev.focusAreas ?? []), ''],
+    }));
   };
 
   const remove = (index: number) => {
-    setResumeData({ ...resumeData, focusAreas: focusAreas.filter((_, i) => i !== index) });
+    updateResumeData((prev) => ({
+      ...prev,
+      focusAreas: (prev.focusAreas ?? []).filter((_, i) => i !== index),
+    }));
   };
 
   const move = (index: number, direction: 'up' | 'down') => {
@@ -26,10 +34,12 @@ export function FocusAreasBlockEditor() {
       (direction === 'down' && index === focusAreas.length - 1)
     )
       return;
-    const updated = [...focusAreas];
-    const target = direction === 'up' ? index - 1 : index + 1;
-    [updated[index], updated[target]] = [updated[target], updated[index]];
-    setResumeData({ ...resumeData, focusAreas: updated });
+    updateResumeData((prev) => {
+      const arr = [...(prev.focusAreas ?? [])];
+      const target = direction === 'up' ? index - 1 : index + 1;
+      [arr[index], arr[target]] = [arr[target], arr[index]];
+      return { ...prev, focusAreas: arr };
+    });
   };
 
   return (

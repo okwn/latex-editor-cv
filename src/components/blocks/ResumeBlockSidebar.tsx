@@ -1,6 +1,7 @@
 'use client';
 
 import { useEditorStore } from '@/lib/resume/editorStore';
+import type { CustomBlock } from '@/types/resume';
 import {
   User,
   FileText,
@@ -12,6 +13,10 @@ import {
   ChevronRight,
   History,
   Download,
+  AlignLeft,
+  Globe,
+  Trophy,
+  Link,
 } from 'lucide-react';
 
 const sectionConfig: {
@@ -31,8 +36,17 @@ const sectionConfig: {
   { id: 'export', label: 'Export', icon: Download },
 ];
 
+const CUSTOM_ICON_MAP: Record<string, React.ComponentType<{ size: number; className?: string }>> = {
+  customText: AlignLeft,
+  languages: Globe,
+  awards: Trophy,
+  links: Link,
+};
+
 export function ResumeBlockSidebar() {
-  const { activeSection, setActiveSection, generateFromBlocks } = useEditorStore();
+  const { activeSection, setActiveSection, generateFromBlocks, resumeData } = useEditorStore();
+
+  const customBlocks: CustomBlock[] = resumeData.customBlocks || [];
 
   return (
     <div className="flex flex-col h-full">
@@ -53,6 +67,27 @@ export function ResumeBlockSidebar() {
             >
               <Icon size={14} className={isActive ? 'text-amber-400' : 'text-zinc-500'} />
               <span className="flex-1 text-left text-xs">{section.label}</span>
+              {isActive && <ChevronRight size={12} className="text-amber-500/50" />}
+            </button>
+          );
+        })}
+
+        {/* Custom blocks */}
+        {customBlocks.map((block) => {
+          const Icon = CUSTOM_ICON_MAP[block.type] || AlignLeft;
+          const isActive = activeSection === `custom-${block.id}`;
+          return (
+            <button
+              key={block.id}
+              onClick={() => setActiveSection(`custom-${block.id}` as typeof activeSection)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-all duration-100 ${
+                isActive
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+              }`}
+            >
+              <Icon size={14} className={isActive ? 'text-amber-400' : 'text-zinc-500'} />
+              <span className="flex-1 text-left text-xs truncate">{block.title}</span>
               {isActive && <ChevronRight size={12} className="text-amber-500/50" />}
             </button>
           );

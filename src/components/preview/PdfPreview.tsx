@@ -1,36 +1,101 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { FileText, ZoomIn, ZoomOut, RotateCcw, ChevronLeft, ChevronRight, Download, Maximize2 } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback, useLayoutEffect } from 'react';
+import {
+  FileText,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  Maximize2,
+  Loader2,
+  MousePointer2,
+  Target,
+} from 'lucide-react';
 import { useEditorStore } from '@/lib/resume/editorStore';
+import { useToast } from '@/components/ui/Toast';
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist';
-import { parseBlockMappings, mapPdfClickToSource, type BlockMapping, type SyncTeXRecord } from '@/lib/compile/synctex-utils';
+import {
+  parseBlockMappings,
+  mapPdfClickToSource,
+  type BlockMapping,
+  type SyncTeXRecord,
+  type KcvBlockId,
+  BLOCK_TO_SECTION,
+  BLOCK_LABEL,
+} from '@/lib/compile/synctex-utils';
+
+export const ZOOM_PRESETS = [0.75, 1, 1.25, 1.5, 1.75, 2] as const;
+export const FIT_WIDTH_TOKEN = -1 as const;
+export type ZoomValue = number | typeof FIT_WIDTH_TOKEN;
+
+function isFitWidth(v: ZoomValue): v is typeof FIT_WIDTH_TOKEN {
+  return v === FIT_WIDTH_TOKEN;
+}
+
+function zoomLabel(v: ZoomValue): string {
+  if (isFitWidth(v)) return 'Fit Width';
+  return `${Math.round(v * 100)}%`;
+}
 
 interface PdfToolbarProps {
   page: number;
   totalPages: number;
-  scale: number;
+  zoom: ZoomValue;
+  navMode: 'synctex' | 'approximate';
   onPageChange: (page: number) => void;
-  onScaleChange: (scale: number) => void;
+  onZoomChange: (zoom: ZoomValue) => void;
   onReload: () => void;
   onExport: () => void;
   status: 'idle' | 'compiling' | 'success' | 'error';
+  isRendering: boolean;
 }
 
-export function PdfToolbar({ page, totalPages, scale, onPageChange, onScaleChange, onReload, onExport, status }: PdfToolbarProps) {
-  const scalePresets = [0.5, 0.75, 1, 1.25, 1.5, 2];
-
+export function PdfToolbar({
+  page,
+  totalPages,
+  zoom,
+  navMode,
+  onPageChange,
+  onZoomChange,
+  onReload,
+  onExport,
+  status,
+  isRendering,
+}: PdfToolbarProps) {
   const statusConfig = {
     idle: { label: 'Not compiled', color: 'text-zinc-500', dot: 'bg-zinc-500' },
-    compiling: { label: 'Compiling...', color: 'text-amber-400', dot: 'bg-amber-400 animate-pulse' },
+    compiling: { label: 'Compiling…', color: 'text-amber-400', dot: 'bg-amber-400 animate-pulse' },
     success: { label: 'Compiled', color: 'text-green-400', dot: 'bg-green-400' },
     error: { label: 'Failed', color: 'text-red-400', dot: 'bg-red-400' },
   };
 
   const s = statusConfig[status];
 
+  const zoomIn = () => {
+    const presets = ZOOM_PRESETS as readonly number[];
+    if (isFitWidth(zoom)) {
+      onZoomChange(presets[0]);
+      return;
+    }
+    const next = presets.find((p) => p > zoom);
+    onZoomChange(next ?? presets[presets.length - 1]);
+  };
+
+  const zoomOut = () => {
+    const presets = ZOOM_PRESETS as readonly number[];
+    if (isFitWidth(zoom)) {
+      onZoomChange(presets[presets.length - 1]);
+      return;
+    }
+    const prev = [...presets].reverse().find((p) => p < zoom);
+    onZoomChange(prev ?? presets[0]);
+  };
+
   return (
-    <div className="flex items-center gap-1 px-3 py-2 border-b border-zinc-800/50 bg-zinc-900/30">
+    <div className="flex items-center gap-1 px-3 py-2 border-b border-zinc-800/50 bg-zinc-900/30 shrink-0">
       {/* Page nav */}
       <button
         onClick={() => onPageChange(Math.max(1, page - 1))}
@@ -40,8 +105,8 @@ export function PdfToolbar({ page, totalPages, scale, onPageChange, onScaleChang
       >
         <ChevronLeft size={14} />
       </button>
-      <span className="text-xs text-zinc-400 min-w-[60px] text-center">
-        {totalPages > 0 ? `${page} / ${totalPages}` : '-'}
+      <span className="text-xs text-zinc-400 min-w-[52px] text-center tabular-nums">
+        {totalPages > 0 ? `${page} / ${totalPages}` : '—'}
       </span>
       <button
         onClick={() => onPageChange(Math.min(totalPages, page + 1))}
@@ -54,33 +119,43 @@ export function PdfToolbar({ page, totalPages, scale, onPageChange, onScaleChang
 
       <div className="w-px h-4 bg-zinc-700 mx-1" />
 
-      {/* Zoom controls */}
+      {/* Zoom out */}
       <button
-        onClick={() => onScaleChange(Math.max(0.25, scale - 0.1))}
+        onClick={zoomOut}
         className="p-1 rounded hover:bg-zinc-800 text-zinc-400 transition-colors"
         title="Zoom out"
       >
         <ZoomOut size={13} />
       </button>
+
+      {/* Zoom select */}
       <select
-        value={scale}
-        onChange={(e) => onScaleChange(parseFloat(e.target.value))}
-        className="bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 px-1 py-0.5 cursor-pointer"
+        value={zoom}
+        onChange={(e) => {
+          const v = parseFloat(e.target.value);
+          onZoomChange(isNaN(v) ? FIT_WIDTH_TOKEN : v);
+        }}
+        className="bg-zinc-800 border border-zinc-700 rounded text-xs text-zinc-300 px-1.5 py-1 cursor-pointer min-w-[90px] text-center"
       >
-        {scalePresets.map((p) => (
+        <option value={FIT_WIDTH_TOKEN}>Fit Width</option>
+        {ZOOM_PRESETS.map((p) => (
           <option key={p} value={p}>{Math.round(p * 100)}%</option>
         ))}
       </select>
+
+      {/* Zoom in */}
       <button
-        onClick={() => onScaleChange(Math.min(3, scale + 0.1))}
+        onClick={zoomIn}
         className="p-1 rounded hover:bg-zinc-800 text-zinc-400 transition-colors"
         title="Zoom in"
       >
         <ZoomIn size={13} />
       </button>
+
+      {/* Fit width */}
       <button
-        onClick={() => onScaleChange(1)}
-        className="p-1 rounded hover:bg-zinc-800 text-zinc-400 transition-colors"
+        onClick={() => onZoomChange(FIT_WIDTH_TOKEN)}
+        className={`p-1 rounded transition-colors ${isFitWidth(zoom) ? 'bg-blue-600/20 text-blue-400' : 'hover:bg-zinc-800 text-zinc-400'}`}
         title="Fit to width"
       >
         <Maximize2 size={13} />
@@ -88,20 +163,59 @@ export function PdfToolbar({ page, totalPages, scale, onPageChange, onScaleChang
 
       <div className="flex-1" />
 
+      {/* Navigation mode indicator */}
+      <div
+        className={`flex items-center gap-1 mr-1.5 text-xs px-1.5 py-0.5 rounded ${
+          navMode === 'synctex'
+            ? 'text-green-400/80 bg-green-400/10'
+            : 'text-zinc-500 bg-zinc-800/50'
+        }`}
+        title={
+          navMode === 'synctex'
+            ? 'SyncTeX: precise line-level navigation (best effort)'
+            : 'Approximate block-level navigation — click to open the corresponding block editor'
+        }
+      >
+        {navMode === 'synctex' ? (
+          <Target size={11} />
+        ) : (
+          <MousePointer2 size={11} />
+        )}
+        <span className="hidden sm:inline">
+          {navMode === 'synctex' ? 'SyncTeX' : 'Block Nav'}
+        </span>
+      </div>
+
+      {/* Rendering spinner */}
+      {isRendering && (
+        <Loader2 size={12} className="text-amber-400 animate-spin mr-1" />
+      )}
+
       {/* Status indicator */}
-      <div className="flex items-center gap-1.5 mr-2">
+      <div className="flex items-center gap-1.5 mr-1">
         <div className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
         <span className={`text-xs ${s.color}`}>{s.label}</span>
       </div>
 
-      {/* Actions */}
+      {/* Reset view */}
+      <button
+        onClick={() => onZoomChange(FIT_WIDTH_TOKEN)}
+        className="p-1 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
+        title="Reset view (Fit Width)"
+      >
+        <RotateCcw size={12} />
+      </button>
+
+      {/* Reload */}
       <button
         onClick={onReload}
         className="p-1.5 rounded hover:bg-zinc-800 text-zinc-400 hover:text-zinc-200 transition-colors"
-        title="Reload PDF"
+        title="Re-compile"
       >
         <RotateCcw size={13} />
       </button>
+
+      {/* Export */}
       <button
         onClick={onExport}
         disabled={status !== 'success'}
@@ -120,102 +234,147 @@ interface PdfPreviewProps {
 }
 
 export function PdfPreview({ className }: PdfPreviewProps) {
-  const { pdfUrl, compileStatus, compileErrors, compile, synctexAvailable, compileId, latexSource } = useEditorStore();
+  const toast = useToast();
+  const {
+    pdfUrl,
+    compileStatus,
+    compileErrors,
+    compile,
+    synctexAvailable,
+    compileId,
+    latexSource,
+    pdfVersion,
+    setActiveSection,
+    setEditorMode,
+  } = useEditorStore();
 
   const [pdfDoc, setPdfDoc] = useState<PDFDocumentProxy | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(0);
-  const [scale, setScale] = useState(1);
-  const [isLoading, setIsLoading] = useState(false);
+  const [zoom, setZoom] = useState<ZoomValue>(FIT_WIDTH_TOKEN);
+  const [containerWidth, setContainerWidth] = useState(0);
+  const [isLoadingPdf, setIsLoadingPdf] = useState(false);
+  const [isRendering, setIsRendering] = useState(false);
   const [renderError, setRenderError] = useState<string | null>(null);
   const [displayUrl, setDisplayUrl] = useState<string | null>(null);
+  const [navMode, setNavMode] = useState<'synctex' | 'approximate'>('approximate');
+
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [lastSuccessfulUrl, setLastSuccessfulUrl] = useState<string | null>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const renderTaskRef = useRef<RenderTask | null>(null);
   const prevUrlRef = useRef<string | null>(null);
   const synctexRecordsRef = useRef<SyncTeXRecord[]>([]);
   const blockMappingsRef = useRef<BlockMapping[]>([]);
+  const [lastSuccessfulUrl, setLastSuccessfulUrl] = useState<string | null>(null);
+
+  // Measure container width for fit-width calculation
+  useLayoutEffect(() => {
+    const el = wrapperRef.current;
+    if (!el) return;
+    setContainerWidth(el.clientWidth);
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerWidth(entry.contentRect.width);
+      }
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
 
   // Update block mappings when LaTeX source changes
   useEffect(() => {
     blockMappingsRef.current = parseBlockMappings(latexSource);
   }, [latexSource]);
 
-  // Load SyncTeX data when compileId changes and synctex is available
+  // Load SyncTeX data when compileId changes
   useEffect(() => {
     if (!compileId || !synctexAvailable) {
       synctexRecordsRef.current = [];
       return;
     }
-
     fetch(`/api/compile?action=synctex&compileId=${encodeURIComponent(compileId)}`)
       .then((res) => res.json())
       .then((data) => {
-        if (data.ok && data.records) {
+        if (data.ok && data.records && data.records.length > 0) {
           synctexRecordsRef.current = data.records;
+          setNavMode('synctex');
+        } else {
+          synctexRecordsRef.current = [];
+          setNavMode('approximate');
         }
       })
       .catch(() => {
         synctexRecordsRef.current = [];
+        setNavMode('approximate');
       });
   }, [compileId, synctexAvailable]);
 
-  // Load PDF when URL changes
+  // Load PDF when pdfUrl + pdfVersion changes
   useEffect(() => {
-    if (pdfUrl === prevUrlRef.current) return;
-    prevUrlRef.current = pdfUrl;
-
-    const cleanupState = () => {
-      setPdfDoc(null);
-      setTotalPages(0);
-      setPage(1);
-    };
-
-    if (!pdfUrl) {
-      cleanupState();
-      return;
-    }
+    const url = pdfUrl;
+    if (!url) return;
+    if (url === prevUrlRef.current) return;
+    prevUrlRef.current = url;
 
     let cancelled = false;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setIsLoading(true);
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setIsLoadingPdf(true);
     setRenderError(null);
 
     import('pdfjs-dist').then(async (pdfjs) => {
-      if (cancelled || pdfUrl !== prevUrlRef.current) return;
-
+      if (cancelled) return;
       pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.mjs';
 
       try {
-        const doc = await pdfjs.getDocument(pdfUrl).promise;
-        if (cancelled || pdfUrl !== prevUrlRef.current) return;
-
+        const doc = await pdfjs.getDocument(url).promise;
+        if (cancelled) return;
         setPdfDoc(doc);
         setTotalPages(doc.numPages);
         setPage(1);
-        setLastSuccessfulUrl(pdfUrl);
-        setDisplayUrl(pdfUrl);
+        setLastSuccessfulUrl(url);
+        setDisplayUrl(url);
       } catch {
-        if (cancelled || pdfUrl !== prevUrlRef.current) return;
-        setRenderError('Failed to load PDF');
+        if (!cancelled) setRenderError('Failed to load PDF');
       } finally {
-        if (!cancelled) setIsLoading(false);
+        if (!cancelled) setIsLoadingPdf(false);
       }
     });
 
     return () => {
       cancelled = true;
     };
+  }, [pdfUrl, pdfVersion]);
+
+  // Reset document state when PDF URL is cleared
+  useEffect(() => {
+    if (pdfUrl) return;
+    setPdfDoc(null);
+    setTotalPages(0);
+    setPage(1);
+    setDisplayUrl(null);
   }, [pdfUrl]);
 
-  // Render current page
+  // Calculate effective scale from zoom + container
+  const getEffectiveScale = useCallback(async (): Promise<number> => {
+    if (!pdfDoc || !wrapperRef.current) return 1;
+    const pdfPage = await pdfDoc.getPage(page);
+    const baseViewport = pdfPage.getViewport({ scale: 1 });
+    if (isFitWidth(zoom)) {
+      const availableWidth = containerWidth - 32; // padding
+      const scale = Math.max(0.25, availableWidth / baseViewport.width);
+      return scale;
+    }
+    return zoom;
+  }, [pdfDoc, zoom, page, containerWidth]);
+
+  // Render the current page
   useEffect(() => {
-    if (!pdfDoc || !canvasRef.current) return;
+    if (!pdfDoc || !canvasRef.current || !wrapperRef.current) return;
 
     let cancelled = false;
+    setIsRendering(true);
 
-    pdfDoc.getPage(page).then((pdfPage) => {
+    const doRender = async () => {
+      const pdfPage = await pdfDoc.getPage(page);
       if (cancelled) return;
 
       if (renderTaskRef.current) {
@@ -223,33 +382,55 @@ export function PdfPreview({ className }: PdfPreviewProps) {
         renderTaskRef.current = null;
       }
 
-      const viewport = pdfPage.getViewport({ scale });
+      const baseViewport = pdfPage.getViewport({ scale: 1 });
+      let effectiveScale = 1;
+      if (isFitWidth(zoom)) {
+        const availableWidth = (wrapperRef.current?.clientWidth ?? containerWidth) - 32;
+        effectiveScale = Math.max(0.25, availableWidth / baseViewport.width);
+      } else {
+        effectiveScale = zoom;
+      }
+
+      const dpr = window.devicePixelRatio || 1;
+      const viewport = pdfPage.getViewport({ scale: effectiveScale });
       const canvas = canvasRef.current!;
       const context = canvas.getContext('2d')!;
 
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
+      canvas.width = Math.round(viewport.width * dpr);
+      canvas.height = Math.round(viewport.height * dpr);
+      canvas.style.width = `${viewport.width}px`;
+      canvas.style.height = `${viewport.height}px`;
 
       const renderContext = {
         canvasContext: context,
         viewport,
         canvas,
+        transform: [dpr, 0, 0, dpr, 0, 0] as [number, number, number, number, number, number],
       };
 
       const task = pdfPage.render(renderContext);
       renderTaskRef.current = task;
 
-      task.promise.then(() => {
-        if (!cancelled) renderTaskRef.current = null;
-      }).catch(() => {
-        if (!cancelled) renderTaskRef.current = null;
-      });
-    });
+      try {
+        await task.promise;
+      } catch {
+        // Cancelled or error
+      } finally {
+        if (!cancelled) setIsRendering(false);
+        renderTaskRef.current = null;
+      }
+    };
+
+    doRender();
 
     return () => {
       cancelled = true;
+      if (renderTaskRef.current) {
+        renderTaskRef.current.cancel();
+        renderTaskRef.current = null;
+      }
     };
-  }, [pdfDoc, page, scale]);
+  }, [pdfDoc, page, zoom, containerWidth, totalPages]);
 
   const handleExport = useCallback(() => {
     const url = displayUrl || lastSuccessfulUrl;
@@ -261,82 +442,119 @@ export function PdfPreview({ className }: PdfPreviewProps) {
   }, [displayUrl, lastSuccessfulUrl]);
 
   const handleReload = useCallback(() => {
-    if (displayUrl && pdfDoc) {
-      // Force re-render of current page
-      setPage((p) => p);
-    } else if (compileStatus === 'success' && pdfUrl) {
-      compile();
-    }
-  }, [displayUrl, pdfDoc, compileStatus, pdfUrl, compile]);
+    if (compileStatus === 'success' && pdfUrl) compile();
+  }, [compileStatus, pdfUrl, compile]);
+
+  const handleCanvasClick = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!canvasRef.current) return;
+      const rect = canvasRef.current.getBoundingClientRect();
+      const xNorm = (e.clientX - rect.left) / rect.width;
+      const yNorm = (e.clientY - rect.top) / rect.height;
+
+      const synctexData =
+        synctexRecordsRef.current.length > 0
+          ? { records: synctexRecordsRef.current, sourcePath: '', hasData: true }
+          : null;
+
+      const result = mapPdfClickToSource(
+        page,
+        xNorm,
+        yNorm,
+        synctexData,
+        blockMappingsRef.current,
+        latexSource
+      );
+
+      const section = BLOCK_TO_SECTION[result.blockId as KcvBlockId];
+      const label = BLOCK_LABEL[result.blockId as KcvBlockId] ?? result.blockId;
+
+      if (result.method === 'synctex') {
+        setEditorMode('latex');
+        useEditorStore.getState().jumpToLine(result.line);
+        toast({ message: `SyncTeX: jumped to line ${result.line}`, type: 'info', duration: 2000 });
+      } else {
+        setActiveSection(section);
+        toast({ message: `Jumped to ${label} block`, type: 'info', duration: 2000 });
+      }
+    },
+    [page, latexSource, setActiveSection, setEditorMode, toast]
+  );
 
   const showPlaceholder = !displayUrl && !lastSuccessfulUrl;
-  const showErrorOverlay = compileStatus === 'error' && !displayUrl && lastSuccessfulUrl;
-  const showCanvas = pdfDoc && !renderError && displayUrl;
+  const showErrorOverlay = compileStatus === 'error' && !displayUrl && !!lastSuccessfulUrl;
+  const showCanvas = !!(pdfDoc && !renderError && displayUrl);
+  const showLoadingPdf = isLoadingPdf;
+  const showRenderingPage = isRendering && !showLoadingPdf && showCanvas;
 
   return (
-    <div className={`flex flex-col h-full ${className || ''}`}>
+    <div className={`flex flex-col h-full ${className ?? ''}`}>
       <PdfToolbar
         page={page}
         totalPages={totalPages}
-        scale={scale}
+        zoom={zoom}
+        navMode={navMode}
         onPageChange={setPage}
-        onScaleChange={setScale}
+        onZoomChange={setZoom}
         onReload={handleReload}
         onExport={handleExport}
         status={compileStatus}
+        isRendering={showRenderingPage}
       />
 
-      <div className="flex-1 overflow-auto bg-zinc-800/20 relative">
+      {/*
+        Wrapper uses overflow-auto so:
+        - When canvas is smaller than container (Fit Width), canvas stays centered
+        - When canvas exceeds container size (high zoom), both axes scroll
+        min-h-0 is critical in flex column context to allow internal scroll
+      */}
+      <div
+        ref={wrapperRef}
+        className="flex-1 overflow-auto min-h-0 relative"
+        style={{ scrollBehavior: 'auto' }}
+      >
+        {/* No PDF yet */}
         {showPlaceholder && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center">
-              <FileText size={48} className="mx-auto mb-3 text-zinc-600" />
+              <FileText size={40} className="mx-auto mb-3 text-zinc-600" />
               <p className="text-sm text-zinc-500 mb-1">No PDF generated yet</p>
-              <p className="text-xs text-zinc-600">Click &ldquo;Apply to LaTeX&rdquo; then &ldquo;Compile&rdquo;</p>
+              <p className="text-xs text-zinc-600">Click &ldquo;Compile&rdquo; to generate PDF</p>
             </div>
           </div>
         )}
 
-        {isLoading && (
+        {/* Loading PDF */}
+        {showLoadingPdf && (
           <div className="absolute inset-0 flex items-center justify-center bg-zinc-950/60 z-10">
             <div className="flex flex-col items-center gap-2">
               <div className="w-5 h-5 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
-              <span className="text-xs text-zinc-400">Loading PDF...</span>
+              <span className="text-xs text-zinc-400">Loading PDF…</span>
             </div>
           </div>
         )}
 
+        {/* Rendering indicator */}
+        {showRenderingPage && (
+          <div className="sticky top-2 left-1/2 z-10 flex items-center gap-1.5 bg-zinc-900/80 px-2 py-1 rounded-md w-max mx-auto">
+            <div className="w-3 h-3 border border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+            <span className="text-xs text-zinc-400">Rendering…</span>
+          </div>
+        )}
+
+        {/* PDF canvas — wrapper allows scroll when canvas exceeds container */}
         {showCanvas && (
-          <div className="flex items-start justify-center p-4 min-h-full">
+          <div className="flex items-start justify-center p-4">
             <canvas
               ref={canvasRef}
-              className="shadow-xl border border-zinc-700/30 cursor-pointer"
-              style={{ maxWidth: '100%' }}
-              onClick={(e) => {
-                if (!canvasRef.current) return;
-                const rect = canvasRef.current.getBoundingClientRect();
-                const xNorm = (e.clientX - rect.left) / rect.width;
-                const yNorm = (e.clientY - rect.top) / rect.height;
-
-                const result = mapPdfClickToSource(
-                  page,
-                  xNorm,
-                  yNorm,
-                  synctexRecordsRef.current.length > 0
-                    ? { records: synctexRecordsRef.current, sourcePath: '', hasData: true }
-                    : null,
-                  blockMappingsRef.current,
-                  latexSource
-                );
-
-                // Trigger jump in editor via store
-                useEditorStore.getState().jumpToLine(result.line);
-              }}
+              className="shadow-xl border border-zinc-700/30 cursor-pointer bg-white"
+              onClick={handleCanvasClick}
             />
           </div>
         )}
 
-        {renderError && (
+        {/* Render error */}
+        {renderError && !showLoadingPdf && (
           <div className="absolute inset-0 flex items-center justify-center">
             <div className="text-center text-red-400">
               <p className="text-sm">{renderError}</p>
@@ -344,7 +562,7 @@ export function PdfPreview({ className }: PdfPreviewProps) {
           </div>
         )}
 
-        {/* Error overlay: keep last successful PDF + show error info */}
+        {/* Compile failed overlay */}
         {showErrorOverlay && (
           <div className="absolute inset-0 bg-zinc-950/70 z-10 flex items-start justify-center pt-8">
             <div className="bg-zinc-900 border border-red-500/30 rounded-lg p-4 max-w-sm mx-4 shadow-xl">

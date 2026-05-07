@@ -3,6 +3,8 @@
  * Contains block-level fallback mapping logic.
  */
 
+import type { ActiveSection } from '@/lib/resume/editorStore';
+
 export type KcvBlockId = 'header' | 'summary' | 'education' | 'skills' | 'projects' | 'focus' | 'certifications';
 
 export interface BlockMapping {
@@ -36,6 +38,28 @@ const BLOCK_PATTERNS: Record<KcvBlockId, RegExp> = {
   projects: /^% KCV-BLOCK: projects/m,
   focus: /^% KCV-BLOCK: focus/m,
   certifications: /^% KCV-BLOCK: certifications/m,
+};
+
+/** Map KcvBlockId to the corresponding ActiveSection for block-editor navigation. */
+export const BLOCK_TO_SECTION: Record<KcvBlockId, ActiveSection> = {
+  header: 'personal',
+  summary: 'summary',
+  education: 'education',
+  skills: 'skills',
+  projects: 'projects',
+  focus: 'focusAreas',
+  certifications: 'certifications',
+};
+
+/** Display labels for each block, used in toasts. */
+export const BLOCK_LABEL: Record<KcvBlockId, string> = {
+  header: 'Header',
+  summary: 'Summary',
+  education: 'Education',
+  skills: 'Skills',
+  projects: 'Projects',
+  focus: 'Focus Areas',
+  certifications: 'Certifications',
 };
 
 /**
@@ -75,9 +99,34 @@ export function parseBlockMappings(latexSource: string): BlockMapping[] {
 }
 
 /**
+ * Find the line number of a KCV-BLOCK marker by blockId.
+ */
+export function findBlockLine(latexSource: string, blockId: KcvBlockId): number {
+  const lines = latexSource.split('\n');
+  const pattern = BLOCK_PATTERNS[blockId];
+  for (let i = 0; i < lines.length; i++) {
+    if (pattern.test(lines[i])) return i + 1;
+  }
+  return 1;
+}
+
+/**
  * Estimate which block a PDF page/position falls into.
- * This is a heuristic based on typical CV layout structure.
- * Returns the block ID and approximate line number.
+ * Uses region-based heuristics on the CV layout.
+ *
+ * Page 1 layout (approximate):
+ *   0–18%   → header (name + role + contact)
+ *  18–32%  → summary
+ *  32–56%  → education
+ *  56–74%  → skills
+ *  74–100% → projects / remaining
+ *
+ * Page 2+ layout:
+ *   0–20%   → projects (continued or second page)
+ *  20–50%  → focus areas
+ *  50–100% → certifications
+ *
+ * This is a best-effort heuristic — SyncTeX is used when available.
  */
 export function mapPdfPositionToBlock(
   page: number,
@@ -85,32 +134,42 @@ export function mapPdfPositionToBlock(
   blocks: BlockMapping[]
 ): { blockId: KcvBlockId; line: number; method: 'block-fallback' } {
   if (page === 1) {
-    if (yNorm < 0.15) {
+    if (yNorm < 0.18) {
       const block = blocks.find((b) => b.blockId === 'header');
-      if (block) return { blockId: 'header', line: block.startLine + 1, method: 'block-fallback' };
-    } else if (yNorm < 0.35) {
+      return { blockId: 'header', line: block ? block.startLine + 1 : 1, method: 'block-fallback' };
+    }
+    if (yNorm < 0.32) {
       const block = blocks.find((b) => b.blockId === 'summary');
-      if (block) return { blockId: 'summary', line: block.startLine + 1, method: 'block-fallback' };
-    } else if (yNorm < 0.65) {
+      return { blockId: 'summary', line: block ? block.startLine + 1 : 1, method: 'block-fallback' };
+    }
+    if (yNorm < 0.56) {
       const block = blocks.find((b) => b.blockId === 'education');
-      if (block) return { blockId: 'education', line: block.startLine + 1, method: 'block-fallback' };
-    } else {
+      return { blockId: 'education', line: block ? block.startLine + 1 : 1, method: 'block-fallback' };
+    }
+    if (yNorm < 0.74) {
       const block = blocks.find((b) => b.blockId === 'skills');
-      if (block) return { blockId: 'skills', line: block.startLine + 1, method: 'block-fallback' };
+      return { blockId: 'skills', line: block ? block.startLine + 1 : 1, method: 'block-fallback' };
     }
+    // Remaining top area of page 1 → projects (if present) or skills
+    const projBlock = blocks.find((b) => b.blockId === 'projects');
+    if (projBlock) return { blockId: 'projects', line: projBlock.startLine + 1, method: 'block-fallback' };
+    const skillsBlock = blocks.find((b) => b.blockId === 'skills');
+    if (skillsBlock) return { blockId: 'skills', line: skillsBlock.startLine + 1, method: 'block-fallback' };
   } else {
-    if (yNorm < 0.25) {
+    // Page 2+
+    if (yNorm < 0.20) {
       const block = blocks.find((b) => b.blockId === 'projects');
-      if (block) return { blockId: 'projects', line: block.startLine + 1, method: 'block-fallback' };
-    } else if (yNorm < 0.55) {
-      const block = blocks.find((b) => b.blockId === 'focus');
-      if (block) return { blockId: 'focus', line: block.startLine + 1, method: 'block-fallback' };
-    } else {
-      const block = blocks.find((b) => b.blockId === 'certifications');
-      if (block) return { blockId: 'certifications', line: block.startLine + 1, method: 'block-fallback' };
+      return { blockId: 'projects', line: block ? block.startLine + 1 : 1, method: 'block-fallback' };
     }
+    if (yNorm < 0.50) {
+      const block = blocks.find((b) => b.blockId === 'focus');
+      return { blockId: 'focus', line: block ? block.startLine + 1 : 1, method: 'block-fallback' };
+    }
+    const block = blocks.find((b) => b.blockId === 'certifications');
+    if (block) return { blockId: 'certifications', line: block.startLine + 1, method: 'block-fallback' };
   }
 
+  // Fallback: return first available block
   if (blocks.length > 0) {
     return { blockId: blocks[0].blockId, line: blocks[0].startLine + 1, method: 'block-fallback' };
   }
@@ -119,52 +178,14 @@ export function mapPdfPositionToBlock(
 }
 
 /**
- * Parse plain-text (.synctex, not .gz) file records.
- * The format is documented in SyncTeX specification.
- */
-export function parsePlainSyncTex(content: string): SyncTeXRecord[] {
-  const records: SyncTeXRecord[] = [];
-  const lines = content.split('\n');
-  let currentSourceFile = '';
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (line.startsWith('Input:')) {
-      currentSourceFile = line.replace('Input:', '').trim();
-      continue;
-    }
-
-    // Records: page h v width height line column
-    const parts = line.split(/\s+/);
-    if (parts.length >= 7) {
-      const page = parseInt(parts[0], 10);
-      if (!isNaN(page)) {
-        records.push({
-          page,
-          h: parseFloat(parts[1]) || 0,
-          v: parseFloat(parts[2]) || 0,
-          width: parseFloat(parts[3]) || 0,
-          height: parseFloat(parts[4]) || 0,
-          line: parseInt(parts[5], 10) || 1,
-          column: parseInt(parts[6], 10) || 1,
-          sourceFile: currentSourceFile,
-        });
-      }
-    }
-  }
-
-  return records;
-}
-
-/**
- * Map a PDF click (page + normalized coords) to a source line.
+ * Map a PDF click (page + normalized coords) to a source line and block.
  *
  * Strategy:
- * 1. If real SyncTeX records are available, find closest record for page+position.
+ * 1. If real SyncTeX records are available (and non-empty), use them.
  * 2. Otherwise, use block-level fallback based on KCV-BLOCK markers.
  *
- * This is best-effort — true SyncTeX mapping requires the full binary format
- * which is complex to parse fully in a client-side context.
+ * This is best-effort. The plain-text SyncTeX format is approximate;
+ * real precision requires the binary .synctex.gz format.
  */
 export function mapPdfClickToSource(
   page: number,
@@ -174,14 +195,13 @@ export function mapPdfClickToSource(
   blockMappings: BlockMapping[],
   latexSource: string
 ): { line: number; blockId: KcvBlockId; method: 'synctex' | 'block-fallback' } {
-  // Try synctex first
+  // --- Attempt SyncTeX mapping -----------------------------------------------
   if (synctexData && synctexData.hasData && synctexData.records.length > 0) {
     const pageRecords = synctexData.records.filter((r) => r.page === page);
     if (pageRecords.length > 0) {
+      // Convert normalized Y to approximate PDF pts (A4 = 842pt height)
+      const targetV = yNorm * 842;
       let closest = pageRecords[0];
-      // Approximate page height in pts (a4 is ~842pt)
-      const approxPageHeight = 842;
-      const targetV = yNorm * approxPageHeight;
       let minDist = Math.abs(closest.v - targetV);
 
       for (const record of pageRecords) {
@@ -193,12 +213,16 @@ export function mapPdfClickToSource(
       }
 
       if (closest.line > 0) {
-        return { line: closest.line, blockId: 'header', method: 'synctex' };
+        return {
+          line: closest.line,
+          blockId: 'header', // SyncTeX doesn't know block IDs — use header as placeholder
+          method: 'synctex',
+        };
       }
     }
   }
 
-  // Fallback to block-level mapping
+  // --- Fallback: block-level region mapping ---------------------------------
   const blocks = blockMappings.length > 0 ? blockMappings : parseBlockMappings(latexSource);
   return mapPdfPositionToBlock(page, yNorm, blocks);
 }

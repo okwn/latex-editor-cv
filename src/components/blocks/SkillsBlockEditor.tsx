@@ -5,36 +5,43 @@ import { Plus, Trash2, ChevronUp, ChevronDown } from 'lucide-react';
 import { v4 as uuid } from 'uuid';
 
 export function SkillsBlockEditor() {
-  const { resumeData, setResumeData } = useEditorStore();
-  const { skillGroups } = resumeData;
+  const { updateResumeData } = useEditorStore();
+  const skillGroups = useEditorStore((s) => s.resumeData.skillGroups ?? []);
 
   const update = (index: number, field: string, value: string) => {
-    const updated = skillGroups.map((g, i) =>
-      i === index ? { ...g, [field]: value } : g
-    );
-    setResumeData({ ...resumeData, skillGroups: updated });
+    updateResumeData((prev) => ({
+      ...prev,
+      skillGroups: (prev.skillGroups ?? []).map((g, i) =>
+        i === index ? { ...g, [field]: value } : g
+      ),
+    }));
   };
 
   const updateSkills = (index: number, skills: string) => {
     const skillList = skills.split(',').map((s) => s.trim()).filter(Boolean);
-    const updated = skillGroups.map((g, i) =>
-      i === index ? { ...g, skills: skillList } : g
-    );
-    setResumeData({ ...resumeData, skillGroups: updated });
+    updateResumeData((prev) => ({
+      ...prev,
+      skillGroups: (prev.skillGroups ?? []).map((g, i) =>
+        i === index ? { ...g, skills: skillList } : g
+      ),
+    }));
   };
 
   const add = () => {
-    setResumeData({
-      ...resumeData,
+    updateResumeData((prev) => ({
+      ...prev,
       skillGroups: [
-        ...skillGroups,
+        ...(prev.skillGroups ?? []),
         { id: uuid(), groupName: '', skills: [] },
       ],
-    });
+    }));
   };
 
   const remove = (index: number) => {
-    setResumeData({ ...resumeData, skillGroups: skillGroups.filter((_, i) => i !== index) });
+    updateResumeData((prev) => ({
+      ...prev,
+      skillGroups: (prev.skillGroups ?? []).filter((_, i) => i !== index),
+    }));
   };
 
   const move = (index: number, direction: 'up' | 'down') => {
@@ -43,10 +50,12 @@ export function SkillsBlockEditor() {
       (direction === 'down' && index === skillGroups.length - 1)
     )
       return;
-    const updated = [...skillGroups];
-    const target = direction === 'up' ? index - 1 : index + 1;
-    [updated[index], updated[target]] = [updated[target], updated[index]];
-    setResumeData({ ...resumeData, skillGroups: updated });
+    updateResumeData((prev) => {
+      const arr = [...(prev.skillGroups ?? [])];
+      const target = direction === 'up' ? index - 1 : index + 1;
+      [arr[index], arr[target]] = [arr[target], arr[index]];
+      return { ...prev, skillGroups: arr };
+    });
   };
 
   return (
